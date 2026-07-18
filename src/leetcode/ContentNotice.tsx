@@ -1,0 +1,116 @@
+import { useEffect, useState } from 'react';
+import type { MasteryRating } from '../domain/types';
+import type { ContentController, ContentNotice as Notice } from './content-controller';
+
+const RATING_OPTIONS: readonly {
+  readonly rating: MasteryRating;
+  readonly label: string;
+  readonly description: string;
+}[] = [
+  { rating: 'AGAIN', label: '未掌握', description: '看了解答，仍无法独立复现' },
+  { rating: 'HARD', label: '吃力', description: '独立完成，但思路不稳或耗时明显' },
+  { rating: 'GOOD', label: '掌握', description: '可以独立完成并讲清思路' },
+  { rating: 'EASY', label: '熟练', description: '快速完成，关键变式也清楚' },
+];
+
+interface Props {
+  readonly controller: ContentController;
+}
+
+export function ContentNotice({ controller }: Props) {
+  const [notice, setNotice] = useState<Notice>({ kind: 'idle' });
+  const [rating, setRating] = useState<MasteryRating | null>(null);
+
+  useEffect(() => controller.subscribe(setNotice), [controller]);
+  if (notice.kind === 'idle') return null;
+
+  if (notice.kind === 'monitoring') {
+    return <aside className="notice notice--compact">正在确认本次提交结果…</aside>;
+  }
+
+  if (notice.kind === 'error') {
+    return <ErrorNotice controller={controller} notice={notice} />;
+  }
+
+  if (notice.kind === 'success') {
+    return <SuccessNotice controller={controller} notice={notice} />;
+  }
+
+  return <RatingNotice controller={controller} notice={notice} rating={rating} setRating={setRating} />;
+}
+
+function RatingNotice({ controller, notice, rating, setRating }: {
+  readonly controller: ContentController;
+  readonly notice: Extract<Notice, { readonly kind: 'rating' }>;
+  readonly rating: MasteryRating | null;
+  readonly setRating: (rating: MasteryRating | null) => void;
+}) {
+  const submitRating = async (value: MasteryRating) => {
+    setRating(value);
+    try {
+      await controller.rate(value);
+    } finally {
+      setRating(null);
+    }
+  };
+
+  return (
+    <aside className="notice notice--rating" aria-label="选择掌握程度">
+      <header><div><span className="eyebrow">Accepted 已记录</span><strong>{notice.title}</strong></div><button onClick={() => controller.dismiss()}>稍后评估</button></header>
+      <p>请选择这次独立完成题目的程度：</p>
+      <div className="rating-grid">
+        {RATING_OPTIONS.map((option) => (
+          <button
+            className={`rating rating--${option.rating.toLowerCase()}`}
+            disabled={rating !== null}
+            key={option.rating}
+            onClick={() => void submitRating(option.rating)}
+          >
+            <strong>{option.label}</strong>
+            <span>{option.description}</span>
+            <small>{formatPreview(notice.preview?.[option.rating])}</small>
+          </button>
+        ))}
+      </div>
+      {notice.previewError && <p className="preview-error">预计日期加载失败：{notice.previewError}</p>}
+      <footer>关闭后会保留为“待评估”，不会静默安排复习。</footer>
+    </aside>
+  );
+}
+
+function ErrorNotice({ controller, notice }: {
+  readonly controller: ContentController;
+  readonly notice: Extract<Notice, { readonly kind: 'error' }>;
+}) {
+  return (
+    <aside className="notice notice--error" role="alert">
+      <header><strong>检测失败</strong><button onClick={() => controller.dismiss()}>关闭</button></header>
+      <p>{notice.message}</p>
+      {notice.retryable && <button className="secondary" onClick={() => void controller.retry()}>重新检测</button>}
+    </aside>
+  );
+}
+
+function SuccessNotice({ controller, notice }: {
+  readonly controller: ContentController;
+  readonly notice: Extract<Notice, { readonly kind: 'success' }>;
+}) {
+  return (
+    <aside className="notice notice--success" role="status">
+      <header><strong>复习计划已更新</strong><button onClick={() => controller.dismiss()}>关闭</button></header>
+      <p>{notice.title}</p>
+      <small>{formatNextReview(notice.nextReviewAt)}</small>
+    </aside>
+  );
+}
+
+function formatPreview(timestamp: number | undefined): string {
+  if (!timestamp) return '正在计算下次复习…';
+  return `下次：${new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(timestamp)}`;
+}
+
+function formatNextReview(timestamp: number | null): string {
+  if (!timestamp) return '下次复习时间将在面板中显示。';
+  const value = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium' }).format(timestamp);
+  return `下次复习：${value}`;
+}

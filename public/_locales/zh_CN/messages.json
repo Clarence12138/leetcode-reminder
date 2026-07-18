@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "小刷记 力扣复习助手"
+  },
+  "extensionDescription": {
+    "message": "自动记录力扣中文站 Accepted，并使用 FSRS 安排科学复习。"
+  }
+}

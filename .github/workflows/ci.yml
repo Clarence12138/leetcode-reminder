@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.12.2
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test (hard timeout 60s)
+        run: timeout --signal=TERM --kill-after=10s 60s pnpm test
+
+      - name: Integration test with local endpoint (hard timeout 60s)
+        run: timeout --signal=TERM --kill-after=10s 60s pnpm test:integration
+
+      - name: Build
+        run: pnpm build
+
+      - name: Create Chrome Web Store ZIP
+        run: pnpm zip
+
+      - name: Validate ZIP, manifest and store assets
+        run: node scripts/validate-package.mjs
+
+      - name: Upload reviewed package
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiaoshuaji-chrome-web-store
+          path: |
+            .output/*.zip
+            store-assets/*.png
+            store-assets/screenshots/*.png
+          if-no-files-found: error
+          retention-days: 14

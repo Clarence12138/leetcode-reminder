@@ -1,0 +1,13 @@
+export const APP_NAME = '小刷记 力扣复习助手';
+export const BACKUP_FORMAT = 'xiaoshuaji-backup/v1';
+export const CURRENT_SCHEMA_VERSION = 1;
+export const DEFAULT_REMINDER_HOUR = 9;
+export const DEFAULT_REMINDER_MINUTE = 0;
+export const DETECTION_DEADLINE_MS = 2 * 60 * 1000;
+export const SUBMISSION_STATUS_POLL_MS = 1 * 1000;
+export const ALARM_NAME = 'xiaoshuaji-daily-summary';
+export const FSRS_ALGORITHM = 'FSRS-6';
+export const FSRS_LIBRARY_VERSION = 'ts-fsrs@5.4.1';
+export const FSRS_PARAMETERS_VERSION = 'xiaoshuaji-fsrs-v1';
+export const FSRS_REQUEST_RETENTION = 0.9;
+export const FSRS_MAXIMUM_INTERVAL_DAYS = 36_500;

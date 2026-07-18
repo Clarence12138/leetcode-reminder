@@ -1,0 +1,13 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-jsx",
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "useUnknownInCatchVariables": true,
+    "types": ["vitest/globals", "@testing-library/jest-dom", "chrome"]
+  },
+  "include": [".wxt/wxt.d.ts", "entrypoints", "src", "tests", "wxt.config.ts", "vitest.config.ts"]
+}

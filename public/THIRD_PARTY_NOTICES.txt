@@ -1,0 +1,8 @@
+小刷记 力扣复习助手包含以下第三方开源软件：
+
+- ts-fsrs 5.4.1（MIT）
+- Dexie 4.4.4（Apache License 2.0）
+- React / React DOM 19.2.7（MIT）
+- Zod 4.4.3（MIT）
+
+完整许可证文本位于本目录的 licenses/ 子目录。

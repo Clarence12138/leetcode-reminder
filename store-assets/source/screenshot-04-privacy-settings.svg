@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1280" viewBox="0 0 1280 1280">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EDF0FF"/>
+      <stop offset="1" stop-color="#E7F7F2"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#7777F2"/>
+      <stop offset="1" stop-color="#44449E"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#36445B" flood-opacity="0.17"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="800" fill="url(#bg)"/>
+  <circle cx="1169" cy="61" r="170" fill="#8AD7BC" opacity="0.11"/>
+  <text x="64" y="60" fill="#22224B" font-size="30" font-weight="700">你的数据，只留在你的浏览器</text>
+  <text x="64" y="91" fill="#6F758B" font-size="15">本地存储 · 无遥测 · 不保存代码、Cookie 或账号凭据</text>
+  <rect x="1040" y="40" width="176" height="42" rx="21" fill="#FFFFFF" opacity="0.88"/>
+  <circle cx="1065" cy="61" r="12" fill="#DDF4EA"/>
+  <path d="M1060 61l4 4 7-9" fill="none" stroke="#32946C" stroke-width="2" stroke-linecap="round"/>
+  <text x="1085" y="66" fill="#34785E" font-size="12" font-weight="700">LOCAL FIRST</text>
+
+  <g filter="url(#shadow)">
+    <rect x="50" y="122" width="1180" height="630" rx="22" fill="#FFFFFF"/>
+  </g>
+  <rect x="50" y="122" width="225" height="630" rx="22" fill="#292958"/>
+  <rect x="253" y="122" width="22" height="630" fill="#292958"/>
+  <g transform="translate(78 151)">
+    <rect width="40" height="40" rx="12" fill="url(#brand)"/>
+    <rect x="10" y="8" width="20" height="24" rx="5" fill="#FFFFFF"/>
+    <circle cx="28" cy="28" r="7" fill="#FF9D4D"/>
+    <text x="54" y="19" fill="#FFFFFF" font-size="16" font-weight="700">小刷记</text>
+    <text x="54" y="38" fill="#AEB2DB" font-size="10">FSRS 间隔复习</text>
+  </g>
+  <text x="78" y="239" fill="#8E93BE" font-size="10" letter-spacing="1.5">复习</text>
+  <circle cx="91" cy="279" r="8" fill="#777CAF"/>
+  <path d="M87 279l3 3 6-7" fill="none" stroke="#292958" stroke-width="1.8"/>
+  <text x="112" y="284" fill="#C5C8E5" font-size="13">今日概览</text>
+  <circle cx="91" cy="326" r="8" fill="none" stroke="#9DA2CC" stroke-width="1.6"/>
+  <text x="112" y="331" fill="#C5C8E5" font-size="13">待复习</text>
+  <rect x="83" y="366" width="16" height="16" rx="3" fill="none" stroke="#9DA2CC" stroke-width="1.5"/>
+  <text x="112" y="380" fill="#C5C8E5" font-size="13">全部题目</text>
+  <path d="M83 425h16m-13-7v14m7-11v11m7-18v18" fill="none" stroke="#9DA2CC" stroke-width="1.6"/>
+  <text x="112" y="430" fill="#C5C8E5" font-size="13">复习历史</text>
+  <text x="78" y="492" fill="#8E93BE" font-size="10" letter-spacing="1.5">系统</text>
+  <path d="M83 531l8-13 8 13z" fill="none" stroke="#9DA2CC" stroke-width="1.5"/>
+  <text x="112" y="531" fill="#C5C8E5" font-size="13">检测异常</text>
+  <rect x="68" y="552" width="190" height="42" rx="11" fill="#444480"/>
+  <circle cx="91" cy="573" r="8" fill="none" stroke="#BFC2E8" stroke-width="1.5"/>
+  <path d="M91 561v4m0 16v4m12-12h-4m-16 0h-4" stroke="#BFC2E8" stroke-width="1.5"/>
+  <text x="112" y="578" fill="#FFFFFF" font-size="13" font-weight="700">设置</text>
+  <rect x="68" y="680" width="190" height="46" rx="12" fill="#353569"/>
+  <path d="M83 703c0-7 4-12 9-12s9 5 9 12v9H83z" fill="none" stroke="#8FE0C1" stroke-width="1.7"/>
+  <circle cx="92" cy="702" r="2" fill="#8FE0C1"/>
+  <text x="112" y="700" fill="#E3E5F7" font-size="11">本地数据已启用</text>
+  <text x="112" y="716" fill="#8F94BE" font-size="9">0 个外部数据接收方</text>
+
+  <rect x="275" y="122" width="955" height="630" rx="22" fill="#F8F9FC"/>
+  <rect x="275" y="122" width="955" height="77" rx="22" fill="#FFFFFF"/>
+  <rect x="275" y="177" width="955" height="22" fill="#FFFFFF"/>
+  <text x="309" y="158" fill="#282C41" font-size="20" font-weight="700">设置</text>
+  <text x="309" y="181" fill="#8A90A3" font-size="11">提醒、备份和本地数据管理</text>
+  <rect x="1036" y="143" width="161" height="34" rx="17" fill="#EAF8F2"/>
+  <circle cx="1056" cy="160" r="7" fill="#4CB187"/>
+  <path d="M1053 160l2 2 4-5" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <text x="1071" y="164" fill="#397B61" font-size="10" font-weight="700">所有更改自动保存</text>
+
+  <rect x="309" y="225" width="554" height="226" rx="18" fill="#FFFFFF" stroke="#EAECF2"/>
+  <text x="337" y="260" fill="#303549" font-size="15" font-weight="700">每日提醒</text>
+  <text x="337" y="282" fill="#9196A7" font-size="10">汇总今日、逾期和待评估记录</text>
+  <rect x="787" y="247" width="48" height="26" rx="13" fill="#5B5BD2"/>
+  <circle cx="822" cy="260" r="10" fill="#FFFFFF"/>
+  <line x1="337" y1="307" x2="835" y2="307" stroke="#ECEEF4"/>
+  <text x="337" y="342" fill="#565C70" font-size="12">提醒时间</text>
+  <rect x="724" y="324" width="111" height="38" rx="10" fill="#F7F8FB" stroke="#E2E5ED"/>
+  <text x="779" y="349" text-anchor="middle" fill="#373C52" font-size="14" font-weight="700">09:00</text>
+  <text x="337" y="394" fill="#565C70" font-size="12">当前时区</text>
+  <text x="835" y="394" text-anchor="end" fill="#7A8093" font-size="11">Asia/Shanghai</text>
+  <rect x="705" y="410" width="130" height="28" rx="14" fill="#EEEEFF"/>
+  <text x="770" y="429" text-anchor="middle" fill="#5A5AC0" font-size="10" font-weight="700">发送测试通知</text>
+
+  <rect x="879" y="225" width="318" height="226" rx="18" fill="#FFFFFF" stroke="#EAECF2"/>
+  <circle cx="914" cy="260" r="17" fill="#EAF8F2"/>
+  <path d="M904 263v-8a10 10 0 0 1 20 0v8m-16 0v8h12v-8" fill="none" stroke="#3C9A72" stroke-width="1.8"/>
+  <text x="942" y="258" fill="#303549" font-size="14" font-weight="700">隐私状态</text>
+  <text x="942" y="278" fill="#5A8A76" font-size="10">仅本地存储</text>
+  <rect x="903" y="307" width="270" height="34" rx="10" fill="#F2FAF7"/>
+  <circle cx="920" cy="324" r="5" fill="#4CB187"/>
+  <text x="935" y="328" fill="#4E6E61" font-size="10">不保存提交代码或凭据</text>
+  <rect x="903" y="351" width="270" height="34" rx="10" fill="#F2FAF7"/>
+  <circle cx="920" cy="368" r="5" fill="#4CB187"/>
+  <text x="935" y="372" fill="#4E6E61" font-size="10">不含遥测和远程代码</text>
+  <rect x="903" y="395" width="270" height="34" rx="10" fill="#F2FAF7"/>
+  <circle cx="920" cy="412" r="5" fill="#4CB187"/>
+  <text x="935" y="416" fill="#4E6E61" font-size="10">只访问 leetcode.cn</text>
+
+  <rect x="309" y="468" width="888" height="148" rx="18" fill="#FFFFFF" stroke="#EAECF2"/>
+  <text x="337" y="503" fill="#303549" font-size="15" font-weight="700">备份与恢复</text>
+  <text x="337" y="525" fill="#9196A7" font-size="10">使用版本化 JSON 在不同浏览器之间手动迁移</text>
+  <rect x="337" y="550" width="142" height="40" rx="11" fill="#5B5BD2"/>
+  <path d="M359 560v16m-6-6l6 6 6-6m-12 11h12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>
+  <text x="380" y="575" fill="#FFFFFF" font-size="11" font-weight="700">导出 JSON 备份</text>
+  <rect x="491" y="550" width="118" height="40" rx="11" fill="#FFFFFF" stroke="#DDE0EA"/>
+  <path d="M512 580v-16m-6 6l6-6 6 6m-12-11h12" fill="none" stroke="#686E83" stroke-width="1.7" stroke-linecap="round"/>
+  <text x="531" y="575" fill="#50566B" font-size="11">合并导入</text>
+  <rect x="854" y="529" width="319" height="62" rx="12" fill="#F8F9FC"/>
+  <text x="874" y="553" fill="#73798D" font-size="10">备份格式</text>
+  <text x="874" y="576" fill="#464B61" font-size="11" font-weight="700">xiaoshuaji-backup/v1</text>
+
+  <rect x="309" y="633" width="888" height="84" rx="18" fill="#FFFFFF" stroke="#F2E2E0"/>
+  <text x="337" y="666" fill="#303549" font-size="14" font-weight="700">本地数据管理</text>
+  <text x="337" y="690" fill="#9196A7" font-size="10">删除后无法撤销，请先导出备份</text>
+  <rect x="1046" y="653" width="127" height="40" rx="11" fill="#FFF2F1" stroke="#FFD7D3"/>
+  <text x="1109" y="678" text-anchor="middle" fill="#BC5A50" font-size="11" font-weight="700">清空全部数据</text>
+</svg>

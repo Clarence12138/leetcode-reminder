@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>小刷记 力扣复习助手｜隐私政策</title>
+    <style>
+      :root { color: #182033; background: #f4f6fb; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; line-height: 1.75; }
+      main { width: min(760px, calc(100% - 32px)); margin: 48px auto; padding: 48px; background: #fff; border: 1px solid #e7eaf2; border-radius: 20px; box-shadow: 0 16px 50px rgba(31, 45, 75, .08); }
+      h1 { margin: 0 0 6px; color: #24245f; font-size: 32px; letter-spacing: -.02em; }
+      h2 { margin-top: 34px; color: #31316f; font-size: 20px; }
+      p, li { color: #4c556d; }
+      .lead { margin-top: 24px; padding: 18px 20px; color: #343b56; background: #f0f2ff; border-left: 4px solid #6868df; border-radius: 8px; }
+      .meta { margin: 0; color: #858ca0; font-size: 14px; }
+      code { padding: 2px 6px; color: #4b4bb4; background: #f2f2fc; border-radius: 5px; }
+      a { color: #5555c7; }
+      footer { margin-top: 40px; padding-top: 22px; border-top: 1px solid #eceef4; color: #858ca0; font-size: 14px; }
+      @media (max-width: 640px) { main { margin: 0; width: 100%; padding: 28px 22px; border: 0; border-radius: 0; box-shadow: none; } h1 { font-size: 27px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>小刷记 力扣复习助手隐私政策</h1>
+        <p class="meta">生效日期：2026 年 7 月 17 日</p>
+      </header>
+
+      <p class="lead">小刷记采用本地优先设计。复习记录不会发送到开发者或第三方服务器；扩展不会保存你的提交代码、Cookie 或账号凭据。</p>
+
+      <h2>1. 处理的数据</h2>
+      <p>当你在已登录的力扣中文站普通题目页主动提交题目时，扩展会读取并在本机保存以下信息：</p>
+      <ul>
+        <li>题目 slug、中文标题、题号、难度、标签和题目地址；</li>
+        <li>力扣提交 ID、Accepted 时间、触发方式和你的掌握程度；</li>
+        <li>由 FSRS 生成的复习状态、下次到期时间和复习历史；</li>
+        <li>提醒时间、通知开关、时区和备份格式版本；</li>
+        <li>检测失败时的错误类型、发生时间和不含代码的诊断摘要。</li>
+      </ul>
+      <p>扩展不会收集姓名、邮箱、手机号、支付信息、精确位置、浏览历史或提交代码，也不会持久化 Cookie、访问令牌或密码。读取中文题目信息时，扩展会临时读取当前页面可见的 <code>csrftoken</code>，仅用于 GraphQL 的同源 <code>X-CSRFToken</code> 请求头；该值不会写入存储、备份或日志，也不会发送给开发者或第三方。</p>
+
+      <h2>2. 使用目的</h2>
+      <p>上述数据仅用于确认 Accepted、避免重复记录、安排间隔复习、展示本地统计、发送用户启用的提醒，以及帮助用户定位检测异常。数据不会用于广告、画像、信用评估或与扩展单一用途无关的目的。</p>
+
+      <h2>3. 存储、传输与保留</h2>
+      <p>题目、提交、复习日志和检测异常保存在扩展本地 IndexedDB；设置和通知幂等状态保存在 <code>chrome.storage.local</code>。扩展不使用 Chrome Sync，也不运营接收这些数据的服务器。</p>
+      <p>扩展仅通过 HTTPS 与 <code>leetcode.cn</code> 通信，以读取当前题目的中文元数据与结构化判题结果；临时 CSRF 值也只用于该同源站点要求的 GraphQL 请求头。持久化数据保留到你在界面中删除单题、清空全部数据或卸载扩展为止。</p>
+
+      <h2>4. 数据分享与出售</h2>
+      <p>小刷记不会出售、出租或共享用户数据，不会把数据传送给广告商、数据经纪商或开发者服务器。排期库随扩展代码在本地运行，不会把复习数据提交给其维护者。</p>
+
+      <h2>5. Chrome 权限</h2>
+      <ul>
+        <li><code>storage</code>：保存本地数据、设置和提醒状态；</li>
+        <li><code>alarms</code>：在用户设定的当地时间安排提醒检查；</li>
+        <li><code>notifications</code>：展示今日/逾期题目和待评估汇总；</li>
+        <li><code>https://leetcode.cn/*</code>：在支持的题目页读取题目元数据、判题结果，并完成力扣要求的同源登录与 CSRF 校验。</li>
+      </ul>
+      <p>扩展不申请 <code>tabs</code>、<code>cookies</code>、<code>downloads</code>、<code>webRequest</code> 或 <code>unlimitedStorage</code>。</p>
+
+      <h2>6. 用户控制</h2>
+      <p>你可以关闭通知、导出版本化 JSON 备份、删除单题或清空全部数据。导入备份前会完整校验；覆盖恢复需要二次确认。卸载扩展会由 Chrome 删除扩展本地存储。</p>
+
+      <h2>7. 安全与远程代码</h2>
+      <p>扩展不加载或执行远程代码，不包含遥测。由于力扣的站内接口可能变化，检测异常会明确显示，而不会通过页面文案猜测成功结果。</p>
+
+      <h2>8. 儿童隐私</h2>
+      <p>本扩展不是面向儿童设计的服务，也不会主动收集任何人的可识别身份信息。</p>
+
+      <h2>9. 政策更新与联系</h2>
+      <p>如果数据处理方式发生实质变化，本页面会更新生效日期，并在扩展版本说明中披露。隐私问题请通过 Chrome Web Store 详情页列出的开发者联系渠道反馈。</p>
+
+      <footer>“LeetCode”和“力扣”是其各自权利人的商标。小刷记与力扣官方无隶属或背书关系。</footer>
+    </main>
+  </body>
+</html>
