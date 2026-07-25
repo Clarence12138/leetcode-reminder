@@ -102,7 +102,10 @@ function deduplicateSubmissions(
 function deduplicateIssues(issues: readonly DetectionIssue[]): DetectionIssue[] {
   const unique = new Map<string, DetectionIssue>();
   for (const issue of issues) {
-    unique.set(issueKey(issue), stripIssueId(issue));
+    const key = issueKey(issue);
+    const normalized = stripIssueId(issue);
+    const stored = unique.get(key);
+    unique.set(key, stored ? mergeIssueStatuses(stored, normalized) : normalized);
   }
   return Array.from(unique.values());
 }
@@ -213,8 +216,24 @@ function issueKey(issue: DetectionIssue): string {
     issue.code,
     issue.retryable,
     issue.diagnostic,
-    issue.resolvedAt,
   ]);
+}
+
+function mergeIssueStatuses(
+  left: DetectionIssue,
+  right: DetectionIssue,
+): DetectionIssue {
+  return {
+    ...left,
+    readAt: earliestTimestamp(left.readAt, right.readAt),
+    resolvedAt: earliestTimestamp(left.resolvedAt, right.resolvedAt),
+  };
+}
+
+function earliestTimestamp(left: number | null, right: number | null): number | null {
+  if (left === null) return right;
+  if (right === null) return left;
+  return Math.min(left, right);
 }
 
 function stripIssueId(issue: DetectionIssue): DetectionIssue {
@@ -224,6 +243,7 @@ function stripIssueId(issue: DetectionIssue): DetectionIssue {
     code: issue.code,
     retryable: issue.retryable,
     diagnostic: issue.diagnostic,
+    readAt: issue.readAt,
     resolvedAt: issue.resolvedAt,
   };
 }

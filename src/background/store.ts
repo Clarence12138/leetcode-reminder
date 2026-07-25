@@ -17,6 +17,14 @@ import type {
 import type { XiaoshuajiDatabase } from './database';
 import { AppError } from './errors';
 import { previewPendingReview, replayReviews, type ReplayResult } from './fsrs';
+import {
+  assertProblemIdentity,
+  assertSameAccepted,
+  createPendingReview,
+  matchesFilter,
+  sortProblems,
+  sortReviews,
+} from './store-helpers';
 import { prepareImportedSnapshot, type PersistedSnapshot } from './store-import';
 
 export interface AcceptedSubmissionInput {
@@ -37,6 +45,8 @@ export interface AttentionCounts {
   readonly pending: number;
 }
 
+export type IssueUpdateResult = Readonly<{ updatedCount: number }>;
+
 export interface ReviewStore {
   recordAccepted(input: AcceptedSubmissionInput): Promise<{
     readonly created: boolean;
@@ -51,6 +61,8 @@ export interface ReviewStore {
   queryDashboard(filter?: DashboardFilter): Promise<DailySummary>;
   getAttentionCounts(dueCutoff?: number): Promise<AttentionCounts>;
   recordIssue(issue: Omit<DetectionIssue, 'id'>): Promise<DetectionIssue>;
+  markIssuesRead(issueIds: readonly number[]): Promise<IssueUpdateResult>;
+  resolveIssues(issueIds: readonly number[]): Promise<IssueUpdateResult>;
   deleteProblem(problemId: string): Promise<boolean>;
   clear(): Promise<void>;
   getSnapshot(): Promise<PersistedSnapshot>;
@@ -175,6 +187,22 @@ export class DexieReviewStore implements ReviewStore {
     return { ...issue, id: Number(id) };
   }
 
+  async markIssuesRead(issueIds: readonly number[]): Promise<IssueUpdateResult> {
+    return this.updateIssues(
+      issueIds,
+      (issue, at) => issue.readAt === null ? { ...issue, readAt: at } : null,
+    );
+  }
+
+  async resolveIssues(issueIds: readonly number[]): Promise<IssueUpdateResult> {
+    return this.updateIssues(
+      issueIds,
+      (issue, at) => issue.readAt === null || issue.resolvedAt === null
+        ? { ...issue, readAt: issue.readAt ?? at, resolvedAt: issue.resolvedAt ?? at }
+        : null,
+    );
+  }
+
   async deleteProblem(problemId: string): Promise<boolean> {
     return this.db.transaction('rw', this.db.problems, this.db.submissions, this.db.issues, async () => {
       const problem = await this.db.problems.get(problemId);
@@ -249,57 +277,21 @@ export class DexieReviewStore implements ReviewStore {
     if (snapshot.submissions.length > 0) await this.db.submissions.bulkAdd([...snapshot.submissions]);
     if (snapshot.issues.length > 0) await this.db.issues.bulkAdd([...snapshot.issues]);
   }
-}
 
-function createPendingReview(input: AcceptedSubmissionInput, detectedAt: number): SubmissionReview {
-  return {
-    submissionId: input.submissionId,
-    problemId: input.metadata.problemId,
-    trigger: input.trigger,
-    acceptedAt: input.acceptedAt,
-    detectedAt,
-    rating: null,
-    fsrsLog: null,
-  };
-}
-
-function assertProblemIdentity(metadata: ProblemMetadata): void {
-  if (metadata.problemId !== `leetcode-cn:${metadata.slug}`) {
-    throw new AppError('INVALID_PROBLEM_ID', '题目 ID 必须与力扣中文站 slug 一致');
+  private async updateIssues(
+    issueIds: readonly number[],
+    update: (issue: DetectionIssue, timestamp: number) => DetectionIssue | null,
+  ): Promise<IssueUpdateResult> {
+    return this.db.transaction('rw', this.db.issues, async () => {
+      const stored = await this.db.issues.bulkGet([...issueIds]);
+      const missingId = issueIds.find((_, index) => stored[index] === undefined);
+      if (missingId !== undefined) throw new AppError('ISSUE_NOT_FOUND', `未找到检测异常 ${missingId}`);
+      const timestamp = this.now();
+      const issues = stored as DetectionIssue[];
+      const updated = issues.map((issue) => update(issue, timestamp))
+        .filter((issue): issue is DetectionIssue => issue !== null);
+      if (updated.length > 0) await this.db.issues.bulkPut(updated);
+      return { updatedCount: updated.length };
+    });
   }
-  const url = new URL(metadata.url);
-  const problemPath = `/problems/${metadata.slug}`;
-  const pathMatches = url.pathname === problemPath || url.pathname.startsWith(`${problemPath}/`);
-  if (url.origin !== 'https://leetcode.cn' || !pathMatches) {
-    throw new AppError('INVALID_PROBLEM_URL', '题目地址不属于当前力扣中文站题目');
-  }
-}
-
-function assertSameAccepted(stored: SubmissionReview, input: AcceptedSubmissionInput): void {
-  if (
-    stored.problemId !== input.metadata.problemId ||
-    stored.acceptedAt !== input.acceptedAt
-  ) {
-    throw new AppError('SUBMISSION_CONFLICT', `提交 ${input.submissionId} 与已有记录冲突`);
-  }
-}
-
-function matchesFilter(problem: ProblemRecord, filter: DashboardFilter): boolean {
-  if (filter.difficulty && problem.difficulty !== filter.difficulty) return false;
-  if (filter.tag && !problem.tags.some((tag) => tag.toLocaleLowerCase() === filter.tag?.toLocaleLowerCase())) {
-    return false;
-  }
-  const search = filter.search?.trim().toLocaleLowerCase();
-  if (!search) return true;
-  return [problem.title, problem.frontendId, problem.slug, ...problem.tags].some((value) =>
-    value.toLocaleLowerCase().includes(search),
-  );
-}
-
-function sortProblems(problems: readonly ProblemRecord[]): ProblemRecord[] {
-  return [...problems].sort((left, right) => right.updatedAt - left.updatedAt);
-}
-
-function sortReviews(reviews: readonly SubmissionReview[]): SubmissionReview[] {
-  return [...reviews].sort((left, right) => right.acceptedAt - left.acceptedAt);
 }

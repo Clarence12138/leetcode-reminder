@@ -1,5 +1,5 @@
 import type {
-  BackupV1,
+  BackupV2,
   DailySummary,
   DetectionIssue,
   MasteryRating,
@@ -59,6 +59,14 @@ export type ExtensionRequest =
       readonly type: 'issue.record';
       readonly payload: Omit<DetectionIssue, 'id'>;
     }
+  | {
+      readonly type: 'issue.mark-read';
+      readonly payload: { readonly issueIds: readonly number[] };
+    }
+  | {
+      readonly type: 'issue.resolve';
+      readonly payload: { readonly issueIds: readonly number[] };
+    }
   | { readonly type: 'notification.test' }
   | { readonly type: 'data.clear' }
   | {
@@ -86,5 +94,7 @@ export type TypedResponse<T extends ExtensionRequest['type']> =
         : T extends 'settings.get' | 'settings.update'
           ? Settings
           : T extends 'backup.export'
-            ? BackupV1
-            : unknown;
+            ? BackupV2
+            : T extends 'issue.mark-read' | 'issue.resolve'
+              ? { readonly updatedCount: number }
+              : unknown;

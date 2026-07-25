@@ -41,6 +41,7 @@
 .rating-pill--good { color: #23664f; background: #e2f2e9; }
 .rating-pill--easy { color: #38649b; background: #e7f0fa; }
 .issue-item { display: flex; align-items: flex-start; gap: 13px; padding: 16px 18px; border-top: 1px solid #e9eeeb; }
+.issue-item.is-unread { background: #fffdfc; }
 .issue-item.is-resolved { opacity: .67; }
 .issue-item__icon { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border-radius: 11px; color: #b44b3e; background: #fde9e7; }
 .issue-item.is-resolved .issue-item__icon { color: var(--green-600); background: var(--green-100); }
@@ -49,9 +50,13 @@
 .issue-item__main strong { font-size: 13px; }
 .issue-item__main p { margin: 0; color: var(--muted); font-size: 10px; }
 .issue-item__main code { overflow-wrap: anywhere; padding: 8px 10px; border-radius: 8px; color: #5e6965; background: #f5f7f5; font: 10px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.status-active, .status-resolved, .status-retry { padding: 3px 7px; border-radius: 999px; font-size: 9px; font-weight: 700; }
+.issue-item__actions, .issue-bulk-actions { display: flex; flex: 0 0 auto; gap: 8px; }
+.issue-item__actions .button { min-height: 32px; padding: 6px 10px; font-size: 10px; }
+.view-content > .inline-notice { margin-bottom: 12px; }
+.status-active, .status-resolved, .status-unread, .status-retry { padding: 3px 7px; border-radius: 999px; font-size: 9px; font-weight: 700; }
 .status-active { color: #a33e36; background: #fde7e5; }
 .status-resolved { color: #267159; background: #e1f2e9; }
+.status-unread { color: #a33e36; background: #fff0ef; }
 .status-retry { color: #8c642b; background: #fff3df; }
 .settings-view { max-width: 900px; margin-inline: auto; }
 .settings-form { display: grid; }
@@ -107,6 +112,10 @@
   .history-item time { display: none; }
   .data-overview { grid-template-columns: repeat(2, 1fr); }
   .setting-row, .danger-row { align-items: flex-start; }
+  .issue-item { flex-wrap: wrap; }
+  .issue-item__actions { width: 100%; justify-content: flex-end; padding-left: 49px; }
+  .issue-bulk-actions { width: 100%; flex-wrap: wrap; }
+  .issue-bulk-actions .button { width: auto; flex: 1 1 180px; }
 }
 
 @media (max-width: 480px) {

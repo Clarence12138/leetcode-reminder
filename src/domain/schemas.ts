@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { BACKUP_FORMAT, CURRENT_SCHEMA_VERSION } from './constants';
+import {
+  BACKUP_FORMAT,
+  BACKUP_SCHEMA_VERSION,
+  CURRENT_SCHEMA_VERSION,
+  LEGACY_BACKUP_FORMAT,
+} from './constants';
+import type { BackupV2 } from './types';
 
 const timestampSchema = z.number().int().nonnegative();
 const nullableTimestampSchema = timestampSchema.nullable();
@@ -87,6 +93,7 @@ export const detectionIssueSchema = z
     ]),
     retryable: z.boolean(),
     diagnostic: z.string().min(1),
+    readAt: nullableTimestampSchema,
     resolvedAt: nullableTimestampSchema,
   })
   .strict();
@@ -113,11 +120,25 @@ export const settingsV0Schema = z
 
 export const backupV1Schema = z
   .object({
-    format: z.literal(BACKUP_FORMAT),
+    format: z.literal(LEGACY_BACKUP_FORMAT),
     exportedAt: z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
       message: '必须是有效的 ISO 时间',
     }),
     schemaVersion: z.literal(CURRENT_SCHEMA_VERSION),
+    settings: settingsSchema,
+    problems: z.array(problemRecordSchema),
+    submissions: z.array(submissionReviewSchema),
+    issues: z.array(detectionIssueSchema.omit({ readAt: true })),
+  })
+  .strict();
+
+export const backupV2Schema = z
+  .object({
+    format: z.literal(BACKUP_FORMAT),
+    exportedAt: z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
+      message: '必须是有效的 ISO 时间',
+    }),
+    schemaVersion: z.literal(BACKUP_SCHEMA_VERSION),
     settings: settingsSchema,
     problems: z.array(problemRecordSchema),
     submissions: z.array(submissionReviewSchema),
@@ -180,6 +201,28 @@ const issueRecordRequestSchema = z
   })
   .strict();
 
+const issueIdsSchema = z
+  .array(z.number().int().positive())
+  .min(1)
+  .refine((issueIds) => new Set(issueIds).size === issueIds.length, {
+    message: '异常 ID 不能重复',
+  });
+
+const issueStatusRequestSchemas = [
+  z
+    .object({
+      type: z.literal('issue.mark-read'),
+      payload: z.object({ issueIds: issueIdsSchema }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('issue.resolve'),
+      payload: z.object({ issueIds: issueIdsSchema }).strict(),
+    })
+    .strict(),
+] as const;
+
 const problemDeleteRequestSchema = z
   .object({
     type: z.literal('problem.delete'),
@@ -204,13 +247,24 @@ export const extensionRequestSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('backup.export') }).strict(),
   backupImportRequestSchema,
   issueRecordRequestSchema,
+  ...issueStatusRequestSchemas,
   z.object({ type: z.literal('notification.test') }).strict(),
   z.object({ type: z.literal('data.clear') }).strict(),
   problemDeleteRequestSchema,
 ]);
 
-export function parseBackup(input: unknown) {
-  return backupV1Schema.parse(input);
+export function parseBackup(input: unknown): BackupV2 {
+  const backup = z.discriminatedUnion('format', [backupV1Schema, backupV2Schema]).parse(input);
+  if (backup.format === BACKUP_FORMAT) return backup;
+  return {
+    ...backup,
+    format: BACKUP_FORMAT,
+    schemaVersion: BACKUP_SCHEMA_VERSION,
+    issues: backup.issues.map((issue) => ({
+      ...issue,
+      readAt: issue.resolvedAt,
+    })),
+  };
 }
 
 export function parseExtensionRequest(input: unknown) {

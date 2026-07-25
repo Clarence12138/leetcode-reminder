@@ -1,14 +1,14 @@
-import { BACKUP_FORMAT, CURRENT_SCHEMA_VERSION } from '../domain/constants';
-import { backupV1Schema, parseBackup } from '../domain/schemas';
-import type { BackupV1 } from '../domain/types';
+import { BACKUP_FORMAT, BACKUP_SCHEMA_VERSION } from '../domain/constants';
+import { backupV2Schema, parseBackup } from '../domain/schemas';
+import type { BackupV2 } from '../domain/types';
 import { AppError } from './errors';
 import type { SettingsRepository } from './settings';
 import type { PersistedSnapshot } from './store-import';
 import type { ReviewStore } from './store';
 
 export interface BackupManager {
-  export(): Promise<BackupV1>;
-  import(input: unknown, mode: 'merge' | 'replace'): Promise<BackupV1>;
+  export(): Promise<BackupV2>;
+  import(input: unknown, mode: 'merge' | 'replace'): Promise<BackupV2>;
 }
 
 export class LocalBackupManager implements BackupManager {
@@ -18,22 +18,22 @@ export class LocalBackupManager implements BackupManager {
     private readonly now: () => number = Date.now,
   ) {}
 
-  async export(): Promise<BackupV1> {
+  async export(): Promise<BackupV2> {
     const [snapshot, settings] = await Promise.all([
       this.store.getSnapshot(),
       this.settings.get(),
     ]);
-    const backup: BackupV1 = {
+    const backup: BackupV2 = {
       format: BACKUP_FORMAT,
       exportedAt: new Date(this.now()).toISOString(),
-      schemaVersion: CURRENT_SCHEMA_VERSION,
+      schemaVersion: BACKUP_SCHEMA_VERSION,
       settings,
       ...snapshot,
     };
-    return backupV1Schema.parse(backup);
+    return backupV2Schema.parse(backup);
   }
 
-  async import(input: unknown, mode: 'merge' | 'replace'): Promise<BackupV1> {
+  async import(input: unknown, mode: 'merge' | 'replace'): Promise<BackupV2> {
     const backup = parseBackup(input);
     const original = await this.store.getSnapshot();
     await this.store.importSnapshot(toSnapshot(backup), mode);
@@ -62,7 +62,7 @@ export class LocalBackupManager implements BackupManager {
   }
 }
 
-function toSnapshot(backup: BackupV1): PersistedSnapshot {
+function toSnapshot(backup: BackupV2): PersistedSnapshot {
   return {
     problems: backup.problems,
     submissions: backup.submissions,

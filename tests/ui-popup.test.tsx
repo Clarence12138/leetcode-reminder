@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PopupApp } from '../entrypoints/popup/PopupApp';
-import type { DailySummary, ProblemRecord, SubmissionReview } from '../src/domain/types';
+import type { DailySummary, DetectionIssue, ProblemRecord, SubmissionReview } from '../src/domain/types';
 
 const problem: ProblemRecord = {
   problemId: 'leetcode-cn:two-sum',
@@ -72,4 +72,32 @@ describe('弹窗', () => {
     }));
     await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(3));
   });
+
+  it('检测异常提醒只统计未读记录', async () => {
+    const issues: readonly DetectionIssue[] = [
+      makeIssue(1, null),
+      makeIssue(2, 1_700_000_000_100),
+    ];
+    sendMessage.mockImplementation((request: { readonly type: string }) => {
+      if (request.type === 'dashboard.query') return Promise.resolve({ ok: true, data: { ...summary, issues } });
+      throw new Error(`unexpected request: ${request.type}`);
+    });
+
+    render(<PopupApp />);
+    expect(await screen.findByText('有 1 条检测异常待查看')).toBeInTheDocument();
+    expect(screen.queryByText('有 2 条检测异常待查看')).not.toBeInTheDocument();
+  });
 });
+
+function makeIssue(id: number, readAt: number | null): DetectionIssue {
+  return {
+    id,
+    slug: 'two-sum',
+    occurredAt: 1_700_000_000_000 + id,
+    code: 'NETWORK_ERROR',
+    retryable: true,
+    diagnostic: `异常 ${id}`,
+    readAt,
+    resolvedAt: null,
+  };
+}

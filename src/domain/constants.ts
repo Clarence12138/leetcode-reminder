@@ -1,5 +1,7 @@
 export const APP_NAME = '小刷记 力扣复习助手';
-export const BACKUP_FORMAT = 'xiaoshuaji-backup/v1';
+export const BACKUP_FORMAT = 'xiaoshuaji-backup/v2';
+export const LEGACY_BACKUP_FORMAT = 'xiaoshuaji-backup/v1';
+export const BACKUP_SCHEMA_VERSION = 2;
 export const CURRENT_SCHEMA_VERSION = 1;
 export const DEFAULT_REMINDER_HOUR = 9;
 export const DEFAULT_REMINDER_MINUTE = 0;

@@ -45,14 +45,14 @@ function DashboardContent({ data, error, refresh, view }: { readonly data: Dashb
   if (view === 'queue') return <QueueView {...props} />;
   if (view === 'problems') return <ProblemsView {...props} />;
   if (view === 'history') return <HistoryView summary={data.summary} />;
-  if (view === 'issues') return <IssuesView summary={data.summary} />;
+  if (view === 'issues') return <IssuesView {...props} />;
   if (view === 'settings') return <SettingsView {...props} settings={data.settings} />;
   return <HomeView summary={data.summary} onNavigate={setViewHash} />;
 }
 
 function Sidebar({ current, data, onNavigate }: { readonly current: ViewKey; readonly data: DashboardData | null; readonly onNavigate: (view: ViewKey) => void }): React.ReactElement {
   const pending = data ? data.summary.dueProblems.length + data.summary.pendingReviews.length : 0;
-  const activeIssues = data?.summary.issues.filter((issue) => issue.resolvedAt === null).length ?? 0;
+  const unreadIssues = data?.summary.issues.filter((issue) => issue.readAt === null).length ?? 0;
   return (
     <aside className="sidebar">
       <Brand />
@@ -61,7 +61,7 @@ function Sidebar({ current, data, onNavigate }: { readonly current: ViewKey; rea
           <button className={current === item.key ? 'is-active' : ''} key={item.key} onClick={() => onNavigate(item.key)} type="button">
             <Icon name={item.icon} /><span>{item.label}</span>
             {item.key === 'queue' && pending > 0 && <b>{pending}</b>}
-            {item.key === 'issues' && activeIssues > 0 && <b className="issue-count">{activeIssues}</b>}
+            {item.key === 'issues' && unreadIssues > 0 && <b className="issue-count">{unreadIssues}</b>}
           </button>
         ))}
       </nav>

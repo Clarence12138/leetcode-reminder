@@ -1,8 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DashboardApp } from '../entrypoints/dashboard/DashboardApp';
+import { HomeView } from '../entrypoints/dashboard/views/HomeView';
+import { IssuesView } from '../entrypoints/dashboard/views/IssuesView';
 import { ProblemsView } from '../entrypoints/dashboard/views/ProblemsView';
 import { SettingsView } from '../entrypoints/dashboard/views/SettingsView';
-import type { DailySummary, ProblemRecord, Settings } from '../src/domain/types';
+import type { DailySummary, DetectionIssue, ProblemRecord, Settings } from '../src/domain/types';
 
 const problems: readonly ProblemRecord[] = [
   makeProblem('1', '两数之和', 'EASY', ['数组']),
@@ -54,7 +57,99 @@ describe('完整面板', () => {
     expect(await screen.findByText(/Chrome 通知 API 已成功创建/)).toBeInTheDocument();
     expect(screen.getByText(/系统是否展示取决于/)).toBeInTheDocument();
   });
+
+  it('异常页支持单条已读、批量解决，并在请求期间禁用操作', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    let finishRequest: ((value: unknown) => void) | undefined;
+    sendMessage.mockImplementation(() => new Promise((resolve) => { finishRequest = resolve; }));
+    const issueSummary = withIssues([
+      makeIssue(1, null, null, '未读异常'),
+      makeIssue(2, 1_700_000_000_100, null, '已读异常'),
+      makeIssue(3, 1_700_000_000_100, 1_700_000_000_200, '已解决异常'),
+    ]);
+
+    render(<IssuesView refresh={refresh} summary={issueSummary} />);
+    expect(screen.getByText(/2 条未解决，1 条未读/)).toBeInTheDocument();
+    expect(within(issueArticle('未读异常')).getByRole('button', { name: '标记已读' })).toBeInTheDocument();
+    expect(within(issueArticle('已读异常')).queryByRole('button', { name: '标记已读' })).not.toBeInTheDocument();
+    expect(within(issueArticle('已解决异常')).queryByRole('button')).not.toBeInTheDocument();
+
+    fireEvent.click(within(issueArticle('未读异常')).getByRole('button', { name: '标记已读' }));
+    expect(sendMessage).toHaveBeenCalledWith({ type: 'issue.mark-read', payload: { issueIds: [1] } });
+    expect(screen.getByRole('button', { name: '处理中…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '全部标记已解决' })).toBeDisabled();
+    finishRequest?.({ ok: true, data: { updatedCount: 1 } });
+    await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+  });
+
+  it('批量操作只提交当前快照中的对应异常 ID', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    render(<IssuesView refresh={refresh} summary={withIssues([
+      makeIssue(1, null, null, '异常一'),
+      makeIssue(2, 1_700_000_000_100, null, '异常二'),
+      makeIssue(3, 1_700_000_000_100, 1_700_000_000_200, '异常三'),
+    ])} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '全部标记已读' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'issue.mark-read', payload: { issueIds: [1] } }));
+    await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+
+    fireEvent.click(screen.getByRole('button', { name: '全部标记已解决' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'issue.resolve', payload: { issueIds: [2, 1] } }));
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(2));
+  });
+
+  it('异常操作失败时明确展示后台错误', async () => {
+    sendMessage.mockResolvedValue({ ok: false, error: { code: 'ISSUE_NOT_FOUND', message: '异常记录不存在。' } });
+    render(<IssuesView refresh={vi.fn()} summary={withIssues([makeIssue(1, null, null, '已失效异常')])} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '全部标记已读' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('异常记录不存在。');
+  });
+
+  it('首页横幅和侧栏红点只统计未读异常', async () => {
+    const issueSummary = withIssues([
+      makeIssue(1, null, null, '未读异常'),
+      makeIssue(2, 1_700_000_000_100, null, '已读但未解决'),
+    ]);
+    const { unmount } = render(<HomeView onNavigate={vi.fn()} summary={issueSummary} />);
+    expect(screen.getByText('有 1 条提交检测异常需要查看')).toBeInTheDocument();
+    unmount();
+
+    sendMessage.mockImplementation((request: { readonly type: string }) => {
+      if (request.type === 'dashboard.query') return Promise.resolve({ ok: true, data: issueSummary });
+      if (request.type === 'settings.get') return Promise.resolve({ ok: true, data: settings });
+      throw new Error(`unexpected request: ${request.type}`);
+    });
+    render(<DashboardApp />);
+    const navigation = await screen.findByRole('navigation', { name: '主导航' });
+    const issuesButton = within(navigation).getByRole('button', { name: /检测异常/ });
+    expect(issuesButton.querySelector('.issue-count')).toHaveTextContent('1');
+  });
 });
+
+function withIssues(issues: readonly DetectionIssue[]): DailySummary {
+  return { ...summary, issues };
+}
+
+function makeIssue(id: number, readAt: number | null, resolvedAt: number | null, diagnostic: string): DetectionIssue {
+  return {
+    id,
+    slug: 'two-sum',
+    occurredAt: 1_700_000_000_000 + id,
+    code: 'NETWORK_ERROR',
+    retryable: true,
+    diagnostic,
+    readAt,
+    resolvedAt,
+  };
+}
+
+function issueArticle(diagnostic: string): HTMLElement {
+  const article = screen.getByText(diagnostic).closest('article');
+  if (!article) throw new Error(`未找到异常条目：${diagnostic}`);
+  return article;
+}
 
 function makeProblem(frontendId: string, title: string, difficulty: ProblemRecord['difficulty'], tags: readonly string[]): ProblemRecord {
   return {

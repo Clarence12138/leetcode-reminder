@@ -81,6 +81,7 @@ describe('后台数据服务', () => {
       code: 'NETWORK_ERROR',
       retryable: true,
       diagnostic: '请求失败',
+      readAt: null,
       resolvedAt: null,
     });
 
@@ -91,7 +92,95 @@ describe('后台数据服务', () => {
       issues: [],
     });
   });
+
+  it('批量标记已读只填写首次已读时间并保持幂等', async () => {
+    let now = Date.UTC(2026, 0, 1, 9);
+    const store = createStore(() => now);
+    const first = await recordIssue(store, 'NETWORK_ERROR');
+    const second = await recordIssue(store, 'TIMEOUT');
+
+    expect(await store.markIssuesRead([requiredId(first), requiredId(second)])).toEqual({
+      updatedCount: 2,
+    });
+    now += HOUR_MS;
+    expect(await store.markIssuesRead([requiredId(first), requiredId(second)])).toEqual({
+      updatedCount: 0,
+    });
+
+    const issues = (await store.queryDashboard()).issues;
+    expect(issues.map((issue) => issue.readAt)).toEqual([
+      Date.UTC(2026, 0, 1, 9),
+      Date.UTC(2026, 0, 1, 9),
+    ]);
+  });
+
+  it('解决异常会隐含标记已读，并保留已有的首次时间', async () => {
+    let now = Date.UTC(2026, 0, 1, 9);
+    const store = createStore(() => now);
+    const unread = await recordIssue(store, 'NETWORK_ERROR');
+    const read = await recordIssue(store, 'TIMEOUT');
+    await store.markIssuesRead([requiredId(read)]);
+
+    now += HOUR_MS;
+    expect(await store.resolveIssues([requiredId(unread), requiredId(read)])).toEqual({
+      updatedCount: 2,
+    });
+    now += HOUR_MS;
+    expect(await store.resolveIssues([requiredId(unread), requiredId(read)])).toEqual({
+      updatedCount: 0,
+    });
+
+    const issues = (await store.queryDashboard()).issues;
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: unread.id,
+        readAt: Date.UTC(2026, 0, 1, 10),
+        resolvedAt: Date.UTC(2026, 0, 1, 10),
+      }),
+      expect.objectContaining({
+        id: read.id,
+        readAt: Date.UTC(2026, 0, 1, 9),
+        resolvedAt: Date.UTC(2026, 0, 1, 10),
+      }),
+    ]));
+  });
+
+  it('任一异常不存在时整批更新失败且不写入已有记录', async () => {
+    const store = createStore(Date.UTC(2026, 0, 1, 9));
+    const issue = await recordIssue(store, 'NETWORK_ERROR');
+
+    await expect(store.markIssuesRead([requiredId(issue), 999])).rejects.toMatchObject({
+      code: 'ISSUE_NOT_FOUND',
+    });
+    await expect(store.resolveIssues([999, requiredId(issue)])).rejects.toMatchObject({
+      code: 'ISSUE_NOT_FOUND',
+    });
+    expect((await store.queryDashboard()).issues[0]).toMatchObject({
+      readAt: null,
+      resolvedAt: null,
+    });
+  });
 });
+
+async function recordIssue(
+  store: DexieReviewStore,
+  code: 'NETWORK_ERROR' | 'TIMEOUT',
+) {
+  return store.recordIssue({
+    slug: 'two-sum',
+    occurredAt: Date.UTC(2026, 0, 1, code === 'NETWORK_ERROR' ? 9 : 10),
+    code,
+    retryable: true,
+    diagnostic: '请求失败',
+    readAt: null,
+    resolvedAt: null,
+  });
+}
+
+function requiredId(issue: { readonly id?: number | undefined }): number {
+  if (issue.id === undefined) throw new Error('测试异常缺少 ID');
+  return issue.id;
+}
 
 function createStore(now: number | (() => number)) {
   const database = new XiaoshuajiDatabase(`test-background-store-${databaseSequence++}`);

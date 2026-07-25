@@ -16,7 +16,7 @@ export function HomeView({
 }): React.ReactElement {
   const problemMap = new Map(summary.problems.map((problem) => [problem.problemId, problem]));
   const ratedCount = summary.recentReviews.filter((review) => review.rating !== null).length;
-  const activeIssues = summary.issues.filter((issue) => issue.resolvedAt === null).length;
+  const unreadIssues = summary.issues.filter((issue) => issue.readAt === null).length;
   return (
     <div className="view-content">
       <PageHeading
@@ -48,9 +48,9 @@ export function HomeView({
             : <div className="rows">{summary.recentReviews.slice(0, PREVIEW_LIMIT).map((review) => <ReviewRow key={review.submissionId} problem={problemMap.get(review.problemId)} review={review} />)}</div>}
         </Panel>
       </div>
-      {activeIssues > 0 && (
+      {unreadIssues > 0 && (
         <button className="issue-banner" onClick={() => onNavigate('issues')} type="button">
-          <span>有 {activeIssues} 条提交检测异常需要查看</span><span>打开异常记录 →</span>
+          <span>有 {unreadIssues} 条提交检测异常需要查看</span><span>打开异常记录 →</span>
         </button>
       )}
     </div>

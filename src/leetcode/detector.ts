@@ -200,6 +200,7 @@ export class SubmissionDetector {
       code: normalized.code,
       retryable: normalized.retryable,
       diagnostic: normalized.message,
+      readAt: null,
       resolvedAt: null,
     });
   }

@@ -54,6 +54,7 @@ function PopupContent({ onRefresh, summary }: { readonly onRefresh: () => Promis
   const problemMap = useMemo(() => new Map(summary.problems.map((problem) => [problem.problemId, problem])), [summary.problems]);
   const dueCount = summary.dueProblems.length;
   const pendingCount = summary.pendingReviews.length;
+  const unreadIssueCount = summary.issues.filter((issue) => issue.readAt === null).length;
   return (
     <>
       <ReviewHero dueCount={dueCount} pendingCount={pendingCount} />
@@ -69,8 +70,8 @@ function PopupContent({ onRefresh, summary }: { readonly onRefresh: () => Promis
       <PopupSection actionLabel="完整记录" onAction={() => openDashboard('#history')} title="最近记录">
         <RecentList problemMap={problemMap} reviews={summary.recentReviews} />
       </PopupSection>
-      {summary.issues.some((issue) => issue.resolvedAt === null) && (
-        <InlineNotice tone="error">有 {summary.issues.filter((issue) => issue.resolvedAt === null).length} 条检测异常待查看</InlineNotice>
+      {unreadIssueCount > 0 && (
+        <InlineNotice tone="error">有 {unreadIssueCount} 条检测异常待查看</InlineNotice>
       )}
       <footer className="popup-footer">
         <span>数据仅保存在当前浏览器</span>

@@ -72,6 +72,7 @@ export interface DetectionIssue {
   readonly code: DetectionIssueCode;
   readonly retryable: boolean;
   readonly diagnostic: string;
+  readonly readAt: number | null;
   readonly resolvedAt: number | null;
 }
 
@@ -97,6 +98,16 @@ export interface BackupV1 {
   readonly format: 'xiaoshuaji-backup/v1';
   readonly exportedAt: string;
   readonly schemaVersion: 1;
+  readonly settings: Settings;
+  readonly problems: readonly ProblemRecord[];
+  readonly submissions: readonly SubmissionReview[];
+  readonly issues: readonly Omit<DetectionIssue, 'readAt'>[];
+}
+
+export interface BackupV2 {
+  readonly format: 'xiaoshuaji-backup/v2';
+  readonly exportedAt: string;
+  readonly schemaVersion: 2;
   readonly settings: Settings;
   readonly problems: readonly ProblemRecord[];
   readonly submissions: readonly SubmissionReview[];

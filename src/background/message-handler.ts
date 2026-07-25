@@ -79,6 +79,10 @@ async function dispatchMaintenanceRequest(
     }
     case 'issue.record':
       return services.store.recordIssue(request.payload);
+    case 'issue.mark-read':
+      return services.store.markIssuesRead(request.payload.issueIds);
+    case 'issue.resolve':
+      return services.store.resolveIssues(request.payload.issueIds);
     case 'notification.test':
       return services.reminders.testNotification();
     case 'data.clear':
