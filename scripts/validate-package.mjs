@@ -5,6 +5,9 @@ import process from 'node:process';
 
 const EXPECTED_PERMISSIONS = Object.freeze(['alarms', 'notifications', 'storage']);
 const EXPECTED_HOSTS = Object.freeze(['https://leetcode.cn/*']);
+const EXPECTED_CONTENT_MATCHES = Object.freeze(['https://leetcode.cn/problems/*']);
+const EXPECTED_DEFAULT_LOCALE = 'zh_CN';
+const EXPECTED_NAME = '__MSG_extensionName__';
 const FORBIDDEN_PERMISSIONS = Object.freeze([
   'cookies',
   'downloads',
@@ -86,10 +89,15 @@ function assertDimensions(buffer, expected, label) {
   );
 }
 
-function validateManifest(manifest) {
+function validateManifest(manifest, packageVersion) {
   invariant(manifest.manifest_version === 3, 'manifest_version 必须为 3。');
+  invariant(manifest.version === packageVersion, `Manifest 版本必须为 ${packageVersion}。`);
+  invariant(manifest.name === EXPECTED_NAME, 'Manifest 名称必须使用本地化键。');
+  invariant(manifest.default_locale === EXPECTED_DEFAULT_LOCALE, 'default_locale 必须为 zh_CN。');
   assertExactArray(manifest.permissions, EXPECTED_PERMISSIONS, 'permissions');
   assertExactArray(manifest.host_permissions, EXPECTED_HOSTS, 'host_permissions');
+  const contentMatches = manifest.content_scripts?.flatMap((script) => script.matches ?? []) ?? [];
+  assertExactArray(contentMatches, EXPECTED_CONTENT_MATCHES, 'content_scripts.matches');
   invariant(!manifest.optional_permissions, '禁止声明 optional_permissions。');
   invariant(!manifest.optional_host_permissions, '禁止声明 optional_host_permissions。');
   invariant(!manifest.externally_connectable, '禁止声明 externally_connectable。');
@@ -123,6 +131,17 @@ function validateNoPackagedRemoteCode({ entries, zipPath }) {
     const html = readZipEntry(zipPath, entry).toString('utf8');
     invariant(!/<script[^>]+src=["']https?:\/\//iu.test(html), `${entry} 引用了远程脚本。`);
   }
+
+  const scriptEntries = entries.filter((entry) => entry.endsWith('.js'));
+  for (const entry of scriptEntries) {
+    const script = readZipEntry(zipPath, entry).toString('utf8');
+    invariant(!/\beval\s*\(/u.test(script), `${entry} 包含 eval。`);
+    invariant(!/\bnew\s+Function\s*\(/u.test(script), `${entry} 包含 new Function。`);
+    invariant(
+      !/\bimport\s*\(\s*["']https?:\/\//u.test(script),
+      `${entry} 包含远程动态 import。`,
+    );
+  }
 }
 
 function validateThirdPartyLicenses(entries) {
@@ -145,7 +164,7 @@ function validateRepositoryAssets(root) {
   const screenshotDir = join(root, 'store-assets', 'screenshots');
   invariant(existsSync(screenshotDir), `缺少截图目录：${screenshotDir}`);
   const screenshots = readdirSync(screenshotDir).filter((name) => name.endsWith('.png'));
-  invariant(screenshots.length >= 3, '至少需要 3 张商店截图。');
+  invariant(screenshots.length === 4, '商店提交必须恰好包含 4 张截图。');
   for (const screenshot of screenshots) {
     const path = join(screenshotDir, screenshot);
     assertDimensions(readFileSync(path), SCREENSHOT_SIZE, path);
@@ -164,11 +183,12 @@ function main() {
   }
 
   const zipPath = findPackageZip(root, explicitPath);
+  const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
   const entries = listZipEntries(zipPath);
   invariant(entries.includes('manifest.json'), 'ZIP 根目录缺少 manifest.json。');
   const manifest = JSON.parse(readZipEntry(zipPath, 'manifest.json').toString('utf8'));
 
-  validateManifest(manifest);
+  validateManifest(manifest, packageJson.version);
   validateZipIcons({ entries, manifest, zipPath });
   validateNoPackagedRemoteCode({ entries, zipPath });
   validateThirdPartyLicenses(entries);

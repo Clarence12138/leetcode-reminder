@@ -14,6 +14,8 @@
 
 小刷记会在你登录力扣中文站并提交普通题目后，通过结构化判题结果确认 Accepted。确认成功后，你可以选择“未掌握、吃力、掌握、熟练”，扩展会根据 FSRS-6 间隔重复算法计算下次复习时间。
 
+安装前数据处理说明：只有在你主动提交支持的力扣题目时，扩展才会处理当前题目地址与元数据、结构化判题结果、提交触发方式和临时 csrftoken；并在当前浏览器本地保存通过记录、评分、复习排期和不含代码的诊断摘要。不读取 Chrome 浏览历史，不跟踪其他网站，不持久化提交代码、Cookie 或账号凭据。除核心功能所必需的 leetcode.cn 同源 HTTPS 通信外，不将数据发送到开发者或其他第三方服务器。
+
 主要能力：
 
 - 支持点击“提交”和 Command/Ctrl + Enter。
@@ -51,25 +53,28 @@
 
 ### 主机权限 `https://leetcode.cn/*`
 
-仅用于普通题目页获取中文题目元数据和结构化判题结果。扩展不读取或保存提交代码、账号密码，也不保存 Cookie；读取题目信息时会临时读取页面可见的 `csrftoken`，仅用于 GraphQL 的同源请求头，不会落盘、导出、记录日志或发送给开发者及第三方。
+仅用于普通题目页获取中文题目元数据和结构化判题结果。扩展不读取或保存提交代码、账号密码，也不保存 Cookie；读取题目信息时会临时读取页面可见的 `csrftoken`，仅用于发送到 `leetcode.cn` 同源 GraphQL 接口的请求头，不会落盘、导出、记录日志或发送给开发者及其他第三方。
 
 ## 隐私实践建议答案
 
-- 是否收集可识别身份信息：否。
+- 是否收集可识别身份信息：否。即使数据只在本机处理，以下类型仍按 Chrome Web Store 口径披露。
 - 是否收集健康、财务、通信或位置数据：否。
-- 认证信息：扩展会在本地临时处理 `csrftoken` 以完成力扣 GraphQL 同源请求；不会保存、导出、记录日志或传给开发者及第三方。提交商店隐私披露时应如实勾选“认证信息”。
+- 认证信息：扩展会临时处理 `csrftoken`，并只将其发送到 `leetcode.cn` 同源 GraphQL 接口；不会保存、导出、记录日志或传给开发者及其他第三方。提交商店隐私披露时应如实勾选“认证信息”。
 - 是否收集网站内容：仅在用户主动提交题目时读取力扣返回的题目元数据和判题结果；不保存代码或页面正文。
+- 是否收集网络历史：是。只保存用户主动提交并确认 Accepted 的当前力扣题目地址和时间，不跟踪其他页面或网站。
+- 是否收集用户活动：是。仅保存题目提交是由点击还是快捷键触发，用于完成明确的提交检测功能。
 - 数据是否出售、用于广告、信用评估或非核心用途：否。
-- 数据是否传输到开发者或第三方服务器：否。
+- 数据是否传输到开发者或第三方服务器：除核心功能所必需的 `leetcode.cn` 同源 HTTPS 通信外，否。
 - 数据是否在传输中加密：扩展只通过 HTTPS 与 `leetcode.cn` 通信；长期数据不离开本机。
 - 是否使用远程代码：否。
+- Limited Use 证明：用户数据仅用于记录已通过题目并安排本地间隔复习；除提供该功能所必需的力扣同源通信外不转移；不用于广告或信用评估；开发者及其他人员无法读取本地数据。整体处理遵守 Chrome Web Store User Data Policy，包括 Limited Use 要求。
 - 隐私政策：将 `docs/privacy.html` 发布到公开 HTTPS 地址后填写。
 
 ## 素材对应关系
 
 - 图标：`public/icons/icon-{16,32,48,128}.png`
 - 小型宣传图：`store-assets/promo-440x280.png`
-- 截图 1：`store-assets/screenshots/01-accepted-rating-1280x800.png`
-- 截图 2：`store-assets/screenshots/02-popup-overview-1280x800.png`
-- 截图 3：`store-assets/screenshots/03-review-dashboard-1280x800.png`
-- 截图 4：`store-assets/screenshots/04-privacy-settings-1280x800.png`
+- 截图 1（首页真实空状态）：`store-assets/screenshots/01-home-1280x800.png`
+- 截图 2（待复习真实空状态）：`store-assets/screenshots/02-review-queue-1280x800.png`
+- 截图 3（检测异常真实空状态）：`store-assets/screenshots/03-diagnostics-1280x800.png`
+- 截图 4（设置与本地备份）：`store-assets/screenshots/04-settings-backup-1280x800.png`

@@ -16,7 +16,7 @@
 
 ## 本地开发
 
-环境要求：Node.js 20.12 或更高版本、pnpm 9.15.9、Chrome。
+环境要求：Node.js 20.19 或更高版本、pnpm 9.15.9、Chrome。
 
 ```bash
 corepack enable

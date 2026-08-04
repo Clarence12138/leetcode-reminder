@@ -3,7 +3,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_DIR="$ROOT_DIR/store-assets/source"
-SCREENSHOT_DIR="$ROOT_DIR/store-assets/screenshots"
 ICON_DIR="$ROOT_DIR/public/icons"
 
 if ! command -v magick >/dev/null 2>&1; then
@@ -15,7 +14,7 @@ if ! command -v qlmanage >/dev/null 2>&1; then
   exit 1
 fi
 
-mkdir -p "$SCREENSHOT_DIR" "$ICON_DIR"
+mkdir -p "$ICON_DIR"
 TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/xiaoshuaji-assets.XXXXXX")"
 trap 'rm -rf -- "$TEMP_DIR"' EXIT
 
@@ -45,10 +44,4 @@ render_text_svg \
   440 \
   280
 
-for source in "$SOURCE_DIR"/screenshot-*.svg; do
-  filename="$(basename "$source" .svg)"
-  output_name="${filename/screenshot-/}-1280x800.png"
-  render_text_svg "$source" "$SCREENSHOT_DIR/$output_name" 1280 800
-done
-
-echo "商店 PNG 素材已生成。"
+echo "图标和商店宣传图已生成；商店截图需从最终扩展真实界面采集。"

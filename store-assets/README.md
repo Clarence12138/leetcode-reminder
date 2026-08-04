@@ -9,10 +9,10 @@
 node scripts/validate-package.mjs
 ```
 
-可编辑源稿位于 `store-assets/source/`。脚本会生成：
+可编辑的图标和宣传图源稿位于 `store-assets/source/`。脚本会生成：
 
 - `public/icons/`：16、32、48、128 px 扩展图标；
 - `promo-440x280.png`：Chrome Web Store 小型宣传图；
-- `screenshots/`：4 张 1280×800 中文产品界面图。
+- `screenshots/`：4 张从最终扩展真实界面采集的 1280×800 中文截图，脚本不会生成或覆盖它们。
 
-商店提交前应把界面图与最终构建逐项比对；如果功能或布局发生变化，必须同步更新源稿，避免商店信息与实际产品不一致。
+仓库不保留合成截图源稿。功能或布局发生变化后，必须重新从最终构建采集截图。
