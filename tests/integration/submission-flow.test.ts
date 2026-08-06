@@ -38,7 +38,11 @@ describe('独立本地端点集成流', () => {
       await detection;
       const pending = await store.queryDashboard();
       expect(pending.pendingReviews).toHaveLength(1);
-      expect(pending.problems[0]).toMatchObject({ title: '两数之和', nextReviewAt: null });
+      expect(pending.problems[0]).toMatchObject({
+        title: '两数之和',
+        tags: ['数组', 'Hash Table'],
+        nextReviewAt: null,
+      });
 
       await store.rateSubmission(SUBMISSION_ID, 'GOOD');
       const rated = await store.queryDashboard();
@@ -96,7 +100,11 @@ function routeStructuredResponse(
       data: {
         question: {
           questionFrontendId: '1', translatedTitle: '两数之和', titleSlug: 'two-sum',
-          difficulty: 'Easy', topicTags: [{ translatedName: '数组' }],
+          difficulty: 'Easy',
+          topicTags: [
+            { name: 'Array', translatedName: '数组' },
+            { name: 'Hash Table', translatedName: null },
+          ],
         },
       },
     });

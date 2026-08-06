@@ -14,7 +14,7 @@ const QUESTION_QUERY = `
       translatedTitle
       titleSlug
       difficulty
-      topicTags { translatedName }
+      topicTags { name translatedName }
     }
   }
 `;
@@ -150,7 +150,10 @@ function toProblemMetadata(question: {
   readonly translatedTitle: string;
   readonly titleSlug: string;
   readonly difficulty: 'EASY' | 'MEDIUM' | 'HARD';
-  readonly topicTags: readonly { readonly translatedName: string }[];
+  readonly topicTags: readonly {
+    readonly name: string;
+    readonly translatedName: string | null;
+  }[];
 }): ProblemMetadata {
   return {
     problemId: buildProblemId(question.titleSlug),
@@ -158,7 +161,7 @@ function toProblemMetadata(question: {
     frontendId: question.questionFrontendId,
     title: question.translatedTitle,
     difficulty: question.difficulty,
-    tags: question.topicTags.map((tag) => tag.translatedName),
+    tags: question.topicTags.map((tag) => tag.translatedName ?? tag.name),
     url: buildProblemUrl(question.titleSlug),
   };
 }

@@ -113,6 +113,24 @@ describe('LeetCodeCnClient', () => {
     });
   });
 
+  it('标签中文名为 null 时使用标签名', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response(lcaQuestionBody()));
+    const client = new LeetCodeCnClient({ fetcher });
+
+    await expect(client.getProblemMetadata(
+      'lowest-common-ancestor-of-a-binary-tree',
+      signal,
+    )).resolves.toMatchObject({
+      frontendId: '236',
+      title: '二叉树的最近公共祖先',
+      tags: ['树', '深度优先搜索', '二叉树', '最近公共祖先', 'Binary Lifting'],
+    });
+    const rawRequestBody = fetcher.mock.calls[0]?.[1]?.body;
+    if (typeof rawRequestBody !== 'string') throw new TypeError('预期 GraphQL 请求体为字符串');
+    const requestBody = JSON.parse(rawRequestBody) as { query: string };
+    expect(requestBody.query).toMatch(/topicTags\s*{\s*name\s+translatedName\s*}/);
+  });
+
   it('GraphQL POST 仅携带 Content-Type 与临时 CSRF 头', async () => {
     const token = readCookieValue('session=opaque; csrftoken=csrf-token==', 'csrftoken');
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response(questionBody('two-sum')));
@@ -163,7 +181,13 @@ function statusBody(submissionId: string | number) {
   };
 }
 
-function questionBody(titleSlug: string) {
+function questionBody(
+  titleSlug: string,
+  topicTags: readonly { readonly name: string; readonly translatedName: string | null }[] = [
+    { name: 'Array', translatedName: '数组' },
+    { name: 'Hash Table', translatedName: '哈希表' },
+  ],
+) {
   return {
     data: {
       question: {
@@ -171,7 +195,27 @@ function questionBody(titleSlug: string) {
         translatedTitle: titleSlug === 'two-sum' ? '两数之和' : '两数相加',
         titleSlug,
         difficulty: titleSlug === 'two-sum' ? 'Easy' : 'Medium',
-        topicTags: [{ translatedName: '数组' }, { translatedName: '哈希表' }],
+        topicTags,
+      },
+    },
+  };
+}
+
+function lcaQuestionBody() {
+  return {
+    data: {
+      question: {
+        questionFrontendId: '236',
+        translatedTitle: '二叉树的最近公共祖先',
+        titleSlug: 'lowest-common-ancestor-of-a-binary-tree',
+        difficulty: 'Medium',
+        topicTags: [
+          { name: 'Tree', translatedName: '树' },
+          { name: 'Depth-First Search', translatedName: '深度优先搜索' },
+          { name: 'Binary Tree', translatedName: '二叉树' },
+          { name: '最近公共祖先', translatedName: null },
+          { name: 'Binary Lifting', translatedName: null },
+        ],
       },
     },
   };

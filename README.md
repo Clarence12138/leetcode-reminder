@@ -44,8 +44,9 @@ node scripts/validate-package.mjs
 
 1. 执行 `pnpm build`。
 2. 打开 `chrome://extensions`，启用“开发者模式”。
-3. 点击“加载已解压的扩展程序”，选择 `.output/chrome-mv3/`。
-4. 登录力扣中文站，进入普通题目页进行真实账号验收。
+3. 点击“加载已解压的扩展程序”，选择 `.output/chrome-mv3/`；如已加载，点击扩展卡片上的“重新加载”。
+4. 刷新已打开的力扣题目页，确保 content script 更新为本次构建。
+5. 登录力扣中文站，进入普通题目页进行真实账号验收。
 
 ## 使用方式
 

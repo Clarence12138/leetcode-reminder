@@ -27,7 +27,8 @@ const difficultySchema = z.string().transform((value, context) => {
 });
 
 const topicTagSchema = z.object({
-  translatedName: z.string().min(1),
+  name: z.string().min(1),
+  translatedName: z.string().min(1).nullable(),
 });
 
 export const questionResponseSchema = z.object({
