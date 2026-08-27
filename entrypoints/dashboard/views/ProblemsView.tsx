@@ -6,15 +6,36 @@ import { formatDate, formatDue } from '../../../src/ui/format';
 import { Icon } from '../../../src/ui/Icon';
 
 type DifficultyFilter = Difficulty | 'ALL';
+type ProblemDateField = 'CREATED_AT' | 'LAST_REVIEW_AT';
+type SortDirection = 'ASC' | 'DESC';
+type ProblemSort = 'CREATED_AT_ASC' | 'CREATED_AT_DESC' | 'LAST_REVIEW_AT_ASC' | 'LAST_REVIEW_AT_DESC';
+
+type ProblemFilters = Readonly<{
+  difficulty: DifficultyFilter;
+  search: string;
+  tag: string;
+}>;
+
+const SORT_OPTIONS: Readonly<Record<ProblemSort, Readonly<{
+  dateField: ProblemDateField;
+  direction: SortDirection;
+}>>> = {
+  CREATED_AT_ASC: { dateField: 'CREATED_AT', direction: 'ASC' },
+  CREATED_AT_DESC: { dateField: 'CREATED_AT', direction: 'DESC' },
+  LAST_REVIEW_AT_ASC: { dateField: 'LAST_REVIEW_AT', direction: 'ASC' },
+  LAST_REVIEW_AT_DESC: { dateField: 'LAST_REVIEW_AT', direction: 'DESC' },
+};
 
 export function ProblemsView({ summary, refresh }: { readonly refresh: () => Promise<void>; readonly summary: DailySummary }): React.ReactElement {
   const [search, setSearch] = useState('');
   const [difficulty, setDifficulty] = useState<DifficultyFilter>('ALL');
   const [tag, setTag] = useState('ALL');
+  const [sort, setSort] = useState<ProblemSort>('CREATED_AT_DESC');
   const tags = useMemo(() => getTags(summary.problems), [summary.problems]);
   const problems = useMemo(
-    () => filterProblems(summary.problems, { difficulty, search, tag }),
-    [difficulty, search, summary.problems, tag],
+    () => [...filterProblems(summary.problems, { difficulty, search, tag })]
+      .sort((left, right) => compareProblems(left, right, sort)),
+    [difficulty, search, sort, summary.problems, tag],
   );
   const resetFilters = (): void => { setSearch(''); setDifficulty('ALL'); setTag('ALL'); };
   return (
@@ -27,6 +48,10 @@ export function ProblemsView({ summary, refresh }: { readonly refresh: () => Pro
         </select>
         <select aria-label="按标签筛选" onChange={(event) => setTag(event.target.value)} value={tag}>
           <option value="ALL">全部标签</option>{tags.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select>
+        <select aria-label="排序方式" onChange={(event) => setSort(event.target.value as ProblemSort)} value={sort}>
+          <option value="CREATED_AT_DESC">添加日期（最新优先）</option><option value="CREATED_AT_ASC">添加日期（最旧优先）</option>
+          <option value="LAST_REVIEW_AT_DESC">最近复习日期（最新优先）</option><option value="LAST_REVIEW_AT_ASC">最近复习日期（最旧优先）</option>
         </select>
         {(search || difficulty !== 'ALL' || tag !== 'ALL') && <Button onClick={resetFilters} tone="ghost">清除筛选</Button>}
       </div>
@@ -77,7 +102,35 @@ function getTags(problems: readonly ProblemRecord[]): readonly string[] {
   return [...new Set(problems.flatMap((problem) => problem.tags))].sort((left, right) => left.localeCompare(right, 'zh-CN'));
 }
 
-function filterProblems(problems: readonly ProblemRecord[], filters: { readonly difficulty: DifficultyFilter; readonly search: string; readonly tag: string }): readonly ProblemRecord[] {
+function compareProblems(left: ProblemRecord, right: ProblemRecord, sort: ProblemSort): number {
+  const { dateField, direction } = SORT_OPTIONS[sort];
+  const bySelectedDate = compareOptionalTimestamp(
+    getProblemTimestamp(left, dateField),
+    getProblemTimestamp(right, dateField),
+    direction,
+  );
+  if (bySelectedDate !== 0) return bySelectedDate;
+  const byCreated = compareTimestamp(left.createdAt, right.createdAt, direction);
+  if (byCreated !== 0) return byCreated;
+  return left.problemId.localeCompare(right.problemId);
+}
+
+function compareOptionalTimestamp(left: number | undefined, right: number | undefined, direction: SortDirection): number {
+  if (left === right) return 0;
+  if (left === undefined) return 1;
+  if (right === undefined) return -1;
+  return compareTimestamp(left, right, direction);
+}
+
+function compareTimestamp(left: number, right: number, direction: SortDirection): number {
+  return direction === 'ASC' ? left - right : right - left;
+}
+
+function getProblemTimestamp(problem: ProblemRecord, dateField: ProblemDateField): number | undefined {
+  return dateField === 'CREATED_AT' ? problem.createdAt : problem.fsrsCard?.last_review;
+}
+
+function filterProblems(problems: readonly ProblemRecord[], filters: ProblemFilters): readonly ProblemRecord[] {
   const query = filters.search.trim().toLocaleLowerCase('zh-CN');
   return problems.filter((problem) => {
     if (filters.difficulty !== 'ALL' && problem.difficulty !== filters.difficulty) return false;

@@ -50,6 +50,50 @@ describe('完整面板', () => {
     expect(screen.queryByText('接雨水')).not.toBeInTheDocument();
   });
 
+  it('支持按添加日期和最近复习日期双向排序', () => {
+    const sortableProblems = [
+      makeProblem('1', '较早添加，最近复习', 'EASY', ['数组'], {
+        createdAt: 1_700_000_000_100,
+        lastReviewAt: 1_700_000_000_600,
+      }),
+      makeProblem('2', '稍晚添加，较早复习', 'MEDIUM', ['哈希表'], {
+        createdAt: 1_700_000_000_300,
+        lastReviewAt: 1_700_000_000_400,
+      }),
+      makeProblem('3', '最新添加，尚未复习', 'HARD', ['栈'], {
+        createdAt: 1_700_000_000_500,
+      }),
+    ];
+    render(<ProblemsView refresh={vi.fn()} summary={{ ...summary, problems: sortableProblems }} />);
+
+    expect(visibleProblemTitles()).toEqual([
+      '最新添加，尚未复习',
+      '稍晚添加，较早复习',
+      '较早添加，最近复习',
+    ]);
+
+    fireEvent.change(screen.getByLabelText('排序方式'), { target: { value: 'CREATED_AT_ASC' } });
+    expect(visibleProblemTitles()).toEqual([
+      '较早添加，最近复习',
+      '稍晚添加，较早复习',
+      '最新添加，尚未复习',
+    ]);
+
+    fireEvent.change(screen.getByLabelText('排序方式'), { target: { value: 'LAST_REVIEW_AT_DESC' } });
+    expect(visibleProblemTitles()).toEqual([
+      '较早添加，最近复习',
+      '稍晚添加，较早复习',
+      '最新添加，尚未复习',
+    ]);
+
+    fireEvent.change(screen.getByLabelText('排序方式'), { target: { value: 'LAST_REVIEW_AT_ASC' } });
+    expect(visibleProblemTitles()).toEqual([
+      '稍晚添加，较早复习',
+      '较早添加，最近复习',
+      '最新添加，尚未复习',
+    ]);
+  });
+
   it('测试通知仅报告 Chrome API 创建成功', async () => {
     render(<SettingsView refresh={vi.fn()} settings={settings} summary={summary} />);
     fireEvent.click(screen.getByRole('button', { name: '发送测试通知' }));
@@ -151,7 +195,19 @@ function issueArticle(diagnostic: string): HTMLElement {
   return article;
 }
 
-function makeProblem(frontendId: string, title: string, difficulty: ProblemRecord['difficulty'], tags: readonly string[]): ProblemRecord {
+function visibleProblemTitles(): string[] {
+  return [...screen.getByLabelText('题目列表').querySelectorAll('.problem-cell a')]
+    .map((link) => link.textContent?.trim() ?? '');
+}
+
+function makeProblem(
+  frontendId: string,
+  title: string,
+  difficulty: ProblemRecord['difficulty'],
+  tags: readonly string[],
+  options: { readonly createdAt?: number; readonly lastReviewAt?: number } = {},
+): ProblemRecord {
+  const createdAt = options.createdAt ?? 1_700_000_000_000;
   return {
     problemId: `leetcode-cn:${frontendId}`,
     slug: frontendId,
@@ -160,9 +216,20 @@ function makeProblem(frontendId: string, title: string, difficulty: ProblemRecor
     difficulty,
     tags,
     url: `https://leetcode.cn/problems/${frontendId}/`,
-    createdAt: 1_700_000_000_000,
-    updatedAt: 1_700_000_000_000,
-    fsrsCard: null,
+    createdAt,
+    updatedAt: createdAt,
+    fsrsCard: options.lastReviewAt === undefined ? null : {
+      due: options.lastReviewAt + 86_400_000,
+      stability: 1,
+      difficulty: 1,
+      elapsed_days: 0,
+      scheduled_days: 1,
+      reps: 1,
+      lapses: 0,
+      learning_steps: 0,
+      state: 2,
+      last_review: options.lastReviewAt,
+    },
     nextReviewAt: 1_700_000_000_000,
     algorithm: 'FSRS-6',
     algorithmLibrary: 'ts-fsrs@5.4.1',
