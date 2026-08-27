@@ -7,7 +7,7 @@ const RATING_OPTIONS: readonly {
   readonly label: string;
   readonly description: string;
 }[] = [
-  { rating: 'AGAIN', label: '未掌握', description: '看了解答，仍无法独立复现' },
+  { rating: 'AGAIN', label: '未掌握', description: '无法独立完成' },
   { rating: 'HARD', label: '吃力', description: '独立完成，但思路不稳或耗时明显' },
   { rating: 'GOOD', label: '掌握', description: '可以独立完成并讲清思路' },
   { rating: 'EASY', label: '熟练', description: '快速完成，关键变式也清楚' },
