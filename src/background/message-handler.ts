@@ -44,6 +44,11 @@ async function dispatchRequest(
       await services.reminders.refreshBadge();
       return result;
     }
+    case 'submission.discard': {
+      const result = await services.store.discardSubmission(request.payload.submissionId);
+      await services.reminders.refreshBadge();
+      return result;
+    }
     case 'review.preview':
       return services.store.preview(request.payload.problemId, request.payload.submissionId);
     case 'dashboard.query':
@@ -62,7 +67,7 @@ async function dispatchRequest(
 
 type MaintenanceRequest = Exclude<
   ExtensionRequest,
-  { readonly type: 'submission.accepted' | 'submission.rate' | 'review.preview' | 'dashboard.query' | 'settings.get' | 'settings.update' }
+  { readonly type: 'submission.accepted' | 'submission.rate' | 'submission.discard' | 'review.preview' | 'dashboard.query' | 'settings.get' | 'settings.update' }
 >;
 
 async function dispatchMaintenanceRequest(

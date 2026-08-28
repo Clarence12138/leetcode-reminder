@@ -65,6 +65,64 @@ describe('ContentController', () => {
       nextReviewAt: NEXT_REVIEW_AT,
     });
   });
+
+  it('不记录本次会丢弃待评估提交并展示确认提示', async () => {
+    const sendMessage = vi.fn().mockImplementation((request: { readonly type: string }) => {
+      if (request.type === 'submission.accepted') {
+        return Promise.resolve({
+          ok: true,
+          data: { created: true, review: review(null, null), nextReviewAt: null },
+        });
+      }
+      if (request.type === 'review.preview') {
+        return Promise.resolve({
+          ok: true,
+          data: {
+            AGAIN: ACCEPTED_AT + 86_400_000,
+            HARD: ACCEPTED_AT + 172_800_000,
+            GOOD: NEXT_REVIEW_AT,
+            EASY: ACCEPTED_AT + 691_200_000,
+          },
+        });
+      }
+      if (request.type === 'submission.discard') {
+        return Promise.resolve({ ok: true, data: { problemDeleted: true } });
+      }
+      throw new Error(`unexpected request: ${request.type}`);
+    });
+    Object.defineProperty(globalThis, 'chrome', {
+      configurable: true,
+      value: { runtime: { sendMessage } },
+    });
+    const notices: ContentNotice[] = [];
+    const controller = new ContentController();
+    controller.subscribe((notice) => notices.push(notice));
+
+    await controller.handleAccepted({
+      metadata: {
+        problemId: 'leetcode-cn:two-sum',
+        slug: 'two-sum',
+        frontendId: '1',
+        title: '两数之和',
+        difficulty: 'EASY',
+        tags: ['数组'],
+        url: 'https://leetcode.cn/problems/two-sum/',
+      },
+      submissionId: '736466958',
+      acceptedAt: ACCEPTED_AT,
+      trigger: 'button',
+    });
+    await controller.discard();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'submission.discard',
+      payload: { submissionId: '736466958' },
+    });
+    expect(notices.at(-1)).toEqual({
+      kind: 'discarded',
+      title: '两数之和',
+    });
+  });
 });
 
 function review(rating: 'GOOD' | null, logDue: number | null) {

@@ -19,6 +19,10 @@ export type ContentNotice =
       readonly nextReviewAt: number | null;
     }
   | {
+      readonly kind: 'discarded';
+      readonly title: string;
+    }
+  | {
       readonly kind: 'error';
       readonly message: string;
       readonly retryable: boolean;
@@ -84,6 +88,16 @@ export class ContentController {
       title,
       nextReviewAt: result.nextReviewAt,
     });
+  }
+
+  async discard(): Promise<void> {
+    if (this.notice.kind !== 'rating') return;
+    const title = this.notice.title;
+    await sendExtensionRequest({
+      type: 'submission.discard',
+      payload: { submissionId: this.notice.review.submissionId },
+    });
+    this.update({ kind: 'discarded', title });
   }
 
   dismiss(): void {

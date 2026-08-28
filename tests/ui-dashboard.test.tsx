@@ -4,8 +4,9 @@ import { DashboardApp } from '../entrypoints/dashboard/DashboardApp';
 import { HomeView } from '../entrypoints/dashboard/views/HomeView';
 import { IssuesView } from '../entrypoints/dashboard/views/IssuesView';
 import { ProblemsView } from '../entrypoints/dashboard/views/ProblemsView';
+import { QueueView } from '../entrypoints/dashboard/views/QueueView';
 import { SettingsView } from '../entrypoints/dashboard/views/SettingsView';
-import type { DailySummary, DetectionIssue, ProblemRecord, Settings } from '../src/domain/types';
+import type { DailySummary, DetectionIssue, ProblemRecord, Settings, SubmissionReview } from '../src/domain/types';
 
 const problems: readonly ProblemRecord[] = [
   makeProblem('1', '两数之和', 'EASY', ['数组']),
@@ -38,6 +39,23 @@ describe('完整面板', () => {
     });
   });
   afterEach(() => { cleanup(); vi.clearAllMocks(); });
+
+  it('待评估卡片需二次确认后才会丢弃提交', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    sendMessage.mockResolvedValue({ ok: true, data: { problemDeleted: true } });
+    const pending = makePendingReview(problems[0]!);
+    render(<QueueView refresh={refresh} summary={{ ...summary, dueProblems: [], pendingReviews: [pending] }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '丢弃两数之和' }));
+    expect(sendMessage).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '确认丢弃两数之和' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
+      type: 'submission.discard',
+      payload: { submissionId: '123' },
+    }));
+    await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+  });
 
   it('支持按中文题名和难度筛选', () => {
     render(<ProblemsView refresh={vi.fn()} summary={summary} />);
@@ -198,6 +216,18 @@ function issueArticle(diagnostic: string): HTMLElement {
 function visibleProblemTitles(): string[] {
   return [...screen.getByLabelText('题目列表').querySelectorAll('.problem-cell a')]
     .map((link) => link.textContent?.trim() ?? '');
+}
+
+function makePendingReview(problem: ProblemRecord): SubmissionReview {
+  return {
+    submissionId: '123',
+    problemId: problem.problemId,
+    trigger: 'button',
+    acceptedAt: 1_700_000_000_000,
+    detectedAt: 1_700_000_000_100,
+    rating: null,
+    fsrsLog: null,
+  };
 }
 
 function makeProblem(

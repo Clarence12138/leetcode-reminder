@@ -28,6 +28,12 @@ export type ExtensionRequest =
       };
     }
   | {
+      readonly type: 'submission.discard';
+      readonly payload: {
+        readonly submissionId: string;
+      };
+    }
+  | {
       readonly type: 'review.preview';
       readonly payload: {
         readonly problemId: string;
@@ -87,6 +93,8 @@ export type TypedResponse<T extends ExtensionRequest['type']> =
       }
     : T extends 'submission.rate'
       ? { readonly review: SubmissionReview; readonly nextReviewAt: number | null }
+      : T extends 'submission.discard'
+        ? { readonly problemDeleted: boolean }
       : T extends 'review.preview'
         ? ReviewPreview
       : T extends 'dashboard.query'

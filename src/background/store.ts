@@ -57,6 +57,7 @@ export interface ReviewStore {
     readonly review: SubmissionReview;
     readonly nextReviewAt: number | null;
   }>;
+  discardSubmission(submissionId: string): Promise<{ readonly problemDeleted: boolean }>;
   preview(problemId: string, submissionId: string): Promise<ReviewPreview>;
   queryDashboard(filter?: DashboardFilter): Promise<DailySummary>;
   getAttentionCounts(dueCutoff?: number): Promise<AttentionCounts>;
@@ -138,6 +139,28 @@ export class DexieReviewStore implements ReviewStore {
         updatedAt: this.now(),
       });
       return { review: updated, nextReviewAt: replayed.card?.due ?? null };
+    });
+  }
+
+  async discardSubmission(submissionId: string): Promise<{ readonly problemDeleted: boolean }> {
+    return this.db.transaction('rw', this.db.problems, this.db.submissions, async () => {
+      const stored = await this.db.submissions.get(submissionId);
+      if (!stored) {
+        throw new AppError('SUBMISSION_NOT_FOUND', `未找到提交 ${submissionId}`);
+      }
+      if (stored.rating !== null) {
+        throw new AppError('SUBMISSION_ALREADY_RATED', `提交 ${submissionId} 已评分，不能丢弃`);
+      }
+
+      await this.db.submissions.delete(submissionId);
+      const remaining = await this.db.submissions.where('problemId').equals(stored.problemId).count();
+      if (remaining > 0) return { problemDeleted: false };
+
+      const problem = await this.db.problems.get(stored.problemId);
+      if (!problem || problem.fsrsCard !== null) return { problemDeleted: false };
+
+      await this.db.problems.delete(stored.problemId);
+      return { problemDeleted: true };
     });
   }
 

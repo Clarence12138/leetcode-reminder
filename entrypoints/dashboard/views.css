@@ -2,7 +2,10 @@
 .pending-card { display: grid; gap: 14px; padding: 15px; border: 1px solid #e0e8e4; border-radius: 13px; background: #fbfcfb; }
 .pending-card__top { display: flex; min-width: 0; align-items: center; gap: 10px; }
 .pending-card__top > span { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border-radius: 9px; color: var(--green-600); background: var(--green-100); }
-.pending-card__top > div { display: grid; min-width: 0; gap: 3px; }
+.pending-card__top > div { display: grid; min-width: 0; flex: 1; gap: 3px; }
+.pending-card__discard { display: inline-flex; flex: 0 0 auto; min-height: 28px; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); background: #fff; cursor: pointer; font-size: 10px; }
+.pending-card__discard.is-confirming { color: #ad3e3e; border-color: #edc4c1; background: #fff3f2; }
+.pending-card__discard:disabled { cursor: wait; opacity: .55; }
 .pending-card__top strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .pending-card__top time { color: var(--muted); font-size: 10px; }
 .pending-card .rating-button { flex: 1; }

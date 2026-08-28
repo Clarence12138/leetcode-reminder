@@ -36,6 +36,10 @@ export function ContentNotice({ controller }: Props) {
     return <SuccessNotice controller={controller} notice={notice} />;
   }
 
+  if (notice.kind === 'discarded') {
+    return <DiscardedNotice controller={controller} notice={notice} />;
+  }
+
   return <RatingNotice controller={controller} notice={notice} rating={rating} setRating={setRating} />;
 }
 
@@ -45,8 +49,13 @@ function RatingNotice({ controller, notice, rating, setRating }: {
   readonly rating: MasteryRating | null;
   readonly setRating: (rating: MasteryRating | null) => void;
 }) {
+  const [discarding, setDiscarding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const busy = rating !== null || discarding;
+
   const submitRating = async (value: MasteryRating) => {
     setRating(value);
+    setError(null);
     try {
       await controller.rate(value);
     } finally {
@@ -54,27 +63,78 @@ function RatingNotice({ controller, notice, rating, setRating }: {
     }
   };
 
+  const discard = async () => {
+    setDiscarding(true);
+    setError(null);
+    try {
+      await controller.discard();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '未能取消记录');
+    } finally {
+      setDiscarding(false);
+    }
+  };
+
   return (
     <aside className="notice notice--rating" aria-label="选择掌握程度">
-      <header><div><span className="eyebrow">Accepted 已记录</span><strong>{notice.title}</strong></div><button onClick={() => controller.dismiss()}>稍后评估</button></header>
+      <header>
+        <div><span className="eyebrow">Accepted 已记录</span><strong>{notice.title}</strong></div>
+        <RatingActions discarding={discarding} disabled={busy} onDefer={() => controller.dismiss()} onDiscard={discard} />
+      </header>
       <p>请选择这次独立完成题目的程度：</p>
-      <div className="rating-grid">
-        {RATING_OPTIONS.map((option) => (
-          <button
-            className={`rating rating--${option.rating.toLowerCase()}`}
-            disabled={rating !== null}
-            key={option.rating}
-            onClick={() => void submitRating(option.rating)}
-          >
-            <strong>{option.label}</strong>
-            <span>{option.description}</span>
-            <small>{formatPreview(notice.preview?.[option.rating])}</small>
-          </button>
-        ))}
-      </div>
+      <RatingGrid busy={busy} notice={notice} onRate={submitRating} />
       {notice.previewError && <p className="preview-error">预计日期加载失败：{notice.previewError}</p>}
-      <footer>关闭后会保留为“待评估”，不会静默安排复习。</footer>
+      {error && <p className="preview-error" role="alert">{error}</p>}
+      <footer>稍后评估会保留为“待评估”；不记录本次不会生成复习计划。</footer>
     </aside>
+  );
+}
+
+function RatingActions({
+  discarding,
+  disabled,
+  onDefer,
+  onDiscard,
+}: {
+  readonly discarding: boolean;
+  readonly disabled: boolean;
+  readonly onDefer: () => void;
+  readonly onDiscard: () => Promise<void>;
+}) {
+  return (
+    <div className="notice-actions">
+      <button disabled={disabled} onClick={onDefer}>稍后评估</button>
+      <button className="notice-discard" disabled={disabled} onClick={() => void onDiscard()}>
+        {discarding ? '处理中…' : '不记录本次'}
+      </button>
+    </div>
+  );
+}
+
+function RatingGrid({
+  busy,
+  notice,
+  onRate,
+}: {
+  readonly busy: boolean;
+  readonly notice: Extract<Notice, { readonly kind: 'rating' }>;
+  readonly onRate: (rating: MasteryRating) => Promise<void>;
+}) {
+  return (
+    <div className="rating-grid">
+      {RATING_OPTIONS.map((option) => (
+        <button
+          className={`rating rating--${option.rating.toLowerCase()}`}
+          disabled={busy}
+          key={option.rating}
+          onClick={() => void onRate(option.rating)}
+        >
+          <strong>{option.label}</strong>
+          <span>{option.description}</span>
+          <small>{formatPreview(notice.preview?.[option.rating])}</small>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -100,6 +160,19 @@ function SuccessNotice({ controller, notice }: {
       <header><strong>复习计划已更新</strong><button onClick={() => controller.dismiss()}>关闭</button></header>
       <p>{notice.title}</p>
       <small>{formatNextReview(notice.nextReviewAt)}</small>
+    </aside>
+  );
+}
+
+function DiscardedNotice({ controller, notice }: {
+  readonly controller: ContentController;
+  readonly notice: Extract<Notice, { readonly kind: 'discarded' }>;
+}) {
+  return (
+    <aside className="notice notice--success" role="status">
+      <header><strong>未记录本次提交</strong><button onClick={() => controller.dismiss()}>关闭</button></header>
+      <p>{notice.title}</p>
+      <small>这条 Accepted 不会进入待评估，也不会改动现有复习计划。</small>
     </aside>
   );
 }

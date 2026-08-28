@@ -6,9 +6,11 @@ import { ratingLabel } from './format';
 const ratings: readonly MasteryRating[] = ['AGAIN', 'HARD', 'GOOD', 'EASY'];
 
 export function RatingButtons({
+  disabled = false,
   onRated,
   submissionId,
 }: {
+  readonly disabled?: boolean;
   readonly onRated: () => void | Promise<void>;
   readonly submissionId: string;
 }): React.ReactElement {
@@ -34,7 +36,7 @@ export function RatingButtons({
         {ratings.map((rating) => (
           <button
             className={`rating-button rating-button--${rating.toLowerCase()}`}
-            disabled={saving !== null}
+            disabled={disabled || saving !== null}
             key={rating}
             onClick={() => void rate(rating)}
             type="button"

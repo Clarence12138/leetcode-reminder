@@ -169,6 +169,13 @@ const rateRequestSchema = z
   })
   .strict();
 
+const discardRequestSchema = z
+  .object({
+    type: z.literal('submission.discard'),
+    payload: z.object({ submissionId: z.string().min(1) }).strict(),
+  })
+  .strict();
+
 const dashboardRequestSchema = z
   .object({
     type: z.literal('dashboard.query'),
@@ -233,6 +240,7 @@ const problemDeleteRequestSchema = z
 export const extensionRequestSchema = z.discriminatedUnion('type', [
   acceptedRequestSchema,
   rateRequestSchema,
+  discardRequestSchema,
   z
     .object({
       type: z.literal('review.preview'),

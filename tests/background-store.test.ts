@@ -93,6 +93,62 @@ describe('后台数据服务', () => {
     });
   });
 
+  it('丢弃唯一待评估提交时会清掉尚未排期的题目',
+    async () => {
+      const store = createStore(Date.UTC(2026, 0, 1, 9));
+      await store.recordAccepted(acceptedInput('100'));
+
+      await expect(store.discardSubmission('100')).resolves.toEqual({ problemDeleted: true });
+      expect(await store.queryDashboard()).toMatchObject({
+        problems: [],
+        pendingReviews: [],
+        recentReviews: [],
+      });
+    });
+
+  it('丢弃已有排期题目的待评估提交时保留题目和历史',
+    async () => {
+      let now = Date.UTC(2026, 0, 1, 9);
+      const store = createStore(() => now);
+      await store.recordAccepted(acceptedInput('100', now));
+      await store.rateSubmission('100', 'GOOD');
+      now += HOUR_MS;
+      await store.recordAccepted(acceptedInput('101', now));
+
+      await expect(store.discardSubmission('101')).resolves.toEqual({ problemDeleted: false });
+      const dashboard = await store.queryDashboard();
+      expect(dashboard.pendingReviews).toHaveLength(0);
+      expect(dashboard.recentReviews).toHaveLength(1);
+      expect(dashboard.problems).toHaveLength(1);
+      expect(dashboard.problems[0]?.fsrsCard).not.toBeNull();
+    });
+
+  it('同一题多条待评估时丢弃一条仍保留题目',
+    async () => {
+      const store = createStore(Date.UTC(2026, 0, 1, 9));
+      await store.recordAccepted(acceptedInput('100'));
+      await store.recordAccepted(acceptedInput('101', Date.UTC(2026, 0, 1, 10)));
+
+      await expect(store.discardSubmission('101')).resolves.toEqual({ problemDeleted: false });
+      const dashboard = await store.queryDashboard();
+      expect(dashboard.pendingReviews.map((review) => review.submissionId)).toEqual(['100']);
+      expect(dashboard.problems).toHaveLength(1);
+    });
+
+  it('拒绝丢弃已评分或不存在的提交', async () => {
+    const store = createStore(Date.UTC(2026, 0, 1, 9));
+    await store.recordAccepted(acceptedInput('100'));
+    await store.rateSubmission('100', 'GOOD');
+
+    await expect(store.discardSubmission('100')).rejects.toMatchObject({
+      code: 'SUBMISSION_ALREADY_RATED',
+    });
+    await expect(store.discardSubmission('missing')).rejects.toMatchObject({
+      code: 'SUBMISSION_NOT_FOUND',
+    });
+    expect((await store.queryDashboard()).recentReviews).toHaveLength(1);
+  });
+
   it('批量标记已读只填写首次已读时间并保持幂等', async () => {
     let now = Date.UTC(2026, 0, 1, 9);
     const store = createStore(() => now);

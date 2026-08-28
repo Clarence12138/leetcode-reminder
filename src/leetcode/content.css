@@ -44,6 +44,22 @@
   white-space: nowrap;
 }
 
+.notice-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.notice header .notice-discard {
+  color: #9a4a4a;
+}
+
+.notice header button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .eyebrow {
   color: #26775a;
   font-size: 12px;
