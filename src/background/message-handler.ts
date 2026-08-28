@@ -96,9 +96,9 @@ async function dispatchMaintenanceRequest(
       await services.reminders.initialize();
       return undefined;
     case 'problem.delete': {
-      const deleted = await services.store.deleteProblem(request.payload.problemId);
+      const result = await services.store.deleteProblems(request.payload.problemIds);
       await services.reminders.refreshBadge();
-      return { deleted };
+      return result;
     }
     default:
       return assertNever(request);

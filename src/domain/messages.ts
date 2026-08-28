@@ -77,7 +77,7 @@ export type ExtensionRequest =
   | { readonly type: 'data.clear' }
   | {
       readonly type: 'problem.delete';
-      readonly payload: { readonly problemId: string };
+      readonly payload: { readonly problemIds: readonly string[] };
     };
 
 export type ExtensionResponse =
@@ -105,4 +105,6 @@ export type TypedResponse<T extends ExtensionRequest['type']> =
             ? BackupV2
             : T extends 'issue.mark-read' | 'issue.resolve'
               ? { readonly updatedCount: number }
-              : unknown;
+              : T extends 'problem.delete'
+                ? { readonly deletedCount: number }
+                : unknown;

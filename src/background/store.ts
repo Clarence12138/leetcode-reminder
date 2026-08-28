@@ -65,6 +65,7 @@ export interface ReviewStore {
   markIssuesRead(issueIds: readonly number[]): Promise<IssueUpdateResult>;
   resolveIssues(issueIds: readonly number[]): Promise<IssueUpdateResult>;
   deleteProblem(problemId: string): Promise<boolean>;
+  deleteProblems(problemIds: readonly string[]): Promise<{ readonly deletedCount: number }>;
   clear(): Promise<void>;
   getSnapshot(): Promise<PersistedSnapshot>;
   importSnapshot(snapshot: PersistedSnapshot, mode: 'merge' | 'replace'): Promise<void>;
@@ -227,15 +228,25 @@ export class DexieReviewStore implements ReviewStore {
   }
 
   async deleteProblem(problemId: string): Promise<boolean> {
+    const { deletedCount } = await this.deleteProblems([problemId]);
+    return deletedCount > 0;
+  }
+
+  async deleteProblems(problemIds: readonly string[]): Promise<{ readonly deletedCount: number }> {
     return this.db.transaction('rw', this.db.problems, this.db.submissions, this.db.issues, async () => {
-      const problem = await this.db.problems.get(problemId);
-      if (!problem) return false;
+      const uniqueIds = [...new Set(problemIds)];
+      const stored = (await this.db.problems.bulkGet(uniqueIds)).filter(
+        (problem): problem is ProblemRecord => problem !== undefined,
+      );
+      if (stored.length === 0) return { deletedCount: 0 };
+      const ids = stored.map((problem) => problem.problemId);
+      const slugs = [...new Set(stored.map((problem) => problem.slug))];
       await Promise.all([
-        this.db.problems.delete(problemId),
-        this.db.submissions.where('problemId').equals(problemId).delete(),
-        this.db.issues.where('slug').equals(problem.slug).delete(),
+        this.db.problems.bulkDelete(ids),
+        this.db.submissions.where('problemId').anyOf(ids).delete(),
+        this.db.issues.where('slug').anyOf(slugs).delete(),
       ]);
-      return true;
+      return { deletedCount: stored.length };
     });
   }
 

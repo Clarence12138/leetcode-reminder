@@ -93,6 +93,37 @@ describe('后台数据服务', () => {
     });
   });
 
+  it('批量删除会清掉对应提交和检测异常，并忽略不存在的题目', async () => {
+    const store = createStore(Date.UTC(2026, 0, 1, 9));
+    await store.recordAccepted(acceptedInput('100'));
+    await store.recordAccepted({
+      metadata: rainWaterMetadata(),
+      submissionId: '200',
+      trigger: 'button',
+      acceptedAt: Date.UTC(2026, 0, 1, 10),
+    });
+    await store.recordIssue({
+      slug: 'two-sum',
+      occurredAt: Date.UTC(2026, 0, 1, 9),
+      code: 'NETWORK_ERROR',
+      retryable: true,
+      diagnostic: '请求失败',
+      readAt: null,
+      resolvedAt: null,
+    });
+
+    await expect(store.deleteProblems([
+      'leetcode-cn:two-sum',
+      'leetcode-cn:trapping-rain-water',
+      'leetcode-cn:missing',
+    ])).resolves.toEqual({ deletedCount: 2 });
+    expect(await store.queryDashboard()).toMatchObject({
+      problems: [],
+      pendingReviews: [],
+      issues: [],
+    });
+  });
+
   it('丢弃唯一待评估提交时会清掉尚未排期的题目',
     async () => {
       const store = createStore(Date.UTC(2026, 0, 1, 9));
@@ -258,5 +289,17 @@ function metadata(): ProblemMetadata {
     difficulty: 'EASY',
     tags: ['数组', '哈希表'],
     url: 'https://leetcode.cn/problems/two-sum/',
+  };
+}
+
+function rainWaterMetadata(): ProblemMetadata {
+  return {
+    problemId: 'leetcode-cn:trapping-rain-water',
+    slug: 'trapping-rain-water',
+    frontendId: '42',
+    title: '接雨水',
+    difficulty: 'HARD',
+    tags: ['栈'],
+    url: 'https://leetcode.cn/problems/trapping-rain-water/',
   };
 }

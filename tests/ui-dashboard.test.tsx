@@ -112,6 +112,46 @@ describe('完整面板', () => {
     ]);
   });
 
+  it('支持全选当前列表后二次确认批量删除', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    sendMessage.mockResolvedValue({ ok: true, data: { deletedCount: 2 } });
+    render(<ProblemsView refresh={refresh} summary={summary} />);
+
+    fireEvent.click(screen.getByLabelText('全选当前题目'));
+    expect(screen.getByLabelText('选择两数之和')).toBeChecked();
+    expect(screen.getByLabelText('选择接雨水')).toBeChecked();
+
+    fireEvent.click(screen.getByRole('button', { name: '删除所选 2 道题' }));
+    expect(sendMessage).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '再点一次确认删除 2 道题' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
+      type: 'problem.delete',
+      payload: { problemIds: ['leetcode-cn:1', 'leetcode-cn:42'] },
+    }));
+    await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+  });
+
+  it('筛选后全选只删除当前可见题目', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    sendMessage.mockResolvedValue({ ok: true, data: { deletedCount: 1 } });
+    render(<ProblemsView refresh={refresh} summary={summary} />);
+
+    fireEvent.click(screen.getByLabelText('选择接雨水'));
+    fireEvent.change(screen.getByLabelText('按难度筛选'), { target: { value: 'EASY' } });
+    expect(screen.queryByLabelText('选择接雨水')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '删除所选 1 道题' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('全选当前题目'));
+    fireEvent.click(screen.getByRole('button', { name: '删除所选 1 道题' }));
+    fireEvent.click(screen.getByRole('button', { name: '再点一次确认删除 1 道题' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
+      type: 'problem.delete',
+      payload: { problemIds: ['leetcode-cn:1'] },
+    }));
+    await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+  });
+
   it('测试通知仅报告 Chrome API 创建成功', async () => {
     render(<SettingsView refresh={vi.fn()} settings={settings} summary={summary} />);
     fireEvent.click(screen.getByRole('button', { name: '发送测试通知' }));

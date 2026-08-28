@@ -230,10 +230,17 @@ const issueStatusRequestSchemas = [
     .strict(),
 ] as const;
 
+const problemIdsSchema = z
+  .array(z.string().min(1))
+  .min(1)
+  .refine((problemIds) => new Set(problemIds).size === problemIds.length, {
+    message: '题目 ID 不能重复',
+  });
+
 const problemDeleteRequestSchema = z
   .object({
     type: z.literal('problem.delete'),
-    payload: z.object({ problemId: z.string().min(1) }).strict(),
+    payload: z.object({ problemIds: problemIdsSchema }).strict(),
   })
   .strict();
 
