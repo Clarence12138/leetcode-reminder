@@ -51,6 +51,7 @@ describe('后台消息', () => {
       notificationsEnabled: true,
       reminderHour: 9,
       reminderMinute: 0,
+      resetCodeOnReview: false,
     });
     expect(await dependencies.settings.getLastNotificationDate()).toBeNull();
     expect(dependencies.badge.text).toBe('');
@@ -74,6 +75,7 @@ describe('后台消息', () => {
       reminderHour: 7,
       reminderMinute: 30,
       schemaVersion: 1,
+      resetCodeOnReview: false,
     });
     await expect(storage.get('settings')).resolves.toMatchObject({
       settings: { schemaVersion: 1 },
@@ -95,6 +97,23 @@ describe('后台消息', () => {
 
     await expect(repository.get()).rejects.toMatchObject({ code: 'SETTINGS_CORRUPT' });
   });
+
+  it('缺少 resetCodeOnReview 的 v1 设置默认关闭',
+    async () => {
+      const storage = new MemoryStorage();
+      await storage.set({
+        settings: {
+          notificationsEnabled: true,
+          reminderHour: 9,
+          reminderMinute: 0,
+          timezone: 'Asia/Shanghai',
+          schemaVersion: 1,
+        },
+      });
+      const repository = new ChromeSettingsRepository(storage, () => 'Asia/Shanghai');
+      await expect(repository.get()).resolves.toMatchObject({ resetCodeOnReview: false });
+    },
+  );
 });
 
 describe('闹钟、通知和角标', () => {

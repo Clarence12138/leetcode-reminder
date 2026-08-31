@@ -7,13 +7,13 @@ const PREVIEW_LIMIT = 5;
 const MORNING_END_HOUR = 11;
 const EVENING_START_HOUR = 18;
 
-export function HomeView({
-  onNavigate,
-  summary,
-}: {
+interface HomeViewProps {
   readonly onNavigate: (view: ViewKey) => void;
+  readonly resetCodeOnReview?: boolean;
   readonly summary: DailySummary;
-}): React.ReactElement {
+}
+
+export function HomeView({ onNavigate, resetCodeOnReview = false, summary }: HomeViewProps): React.ReactElement {
   const problemMap = new Map(summary.problems.map((problem) => [problem.problemId, problem]));
   const ratedCount = summary.recentReviews.filter((review) => review.rating !== null).length;
   const unreadIssues = summary.issues.filter((issue) => issue.readAt === null).length;
@@ -37,7 +37,7 @@ export function HomeView({
         >
           {summary.dueProblems.length === 0
             ? <EmptyState description="今天没有到期题目，可以学一道新题。" icon="sparkle" title="复习已清空" />
-            : <div className="rows">{summary.dueProblems.slice(0, PREVIEW_LIMIT).map((problem) => <ProblemRow compact key={problem.problemId} problem={problem} />)}</div>}
+            : <div className="rows">{summary.dueProblems.slice(0, PREVIEW_LIMIT).map((problem) => <ProblemRow compact key={problem.problemId} problem={problem} reviewJump={resetCodeOnReview} />)}</div>}
         </Panel>
         <Panel
           action={<button className="text-action" onClick={() => onNavigate('history')} type="button">复习历史</button>}

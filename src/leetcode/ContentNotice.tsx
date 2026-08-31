@@ -24,6 +24,10 @@ export function ContentNotice({ controller }: Props) {
   useEffect(() => controller.subscribe(setNotice), [controller]);
   if (notice.kind === 'idle') return null;
 
+  if (notice.kind === 'hint') {
+    return <aside className="notice notice--compact">{notice.text}</aside>;
+  }
+
   if (notice.kind === 'monitoring') {
     return <aside className="notice notice--compact">正在确认本次提交结果…</aside>;
   }

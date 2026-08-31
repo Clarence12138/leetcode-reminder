@@ -17,7 +17,7 @@ export function SettingsView({ refresh, settings, summary }: SettingsProps): Rea
   const [reminderNotice, setReminderNotice] = useState<Notice | null>(null);
   return (
     <div className="view-content settings-view">
-      <PageHeading description="调整每日提醒，或管理仅保存在本机的复习数据。" title="设置" />
+      <PageHeading description="调整每日提醒、复习时的代码还原，或管理仅保存在本机的复习数据。" title="设置" />
       <ReminderPanel
         key={`${settings.notificationsEnabled}-${settings.reminderHour}-${settings.reminderMinute}-${settings.timezone}`}
         notice={reminderNotice}
@@ -25,6 +25,7 @@ export function SettingsView({ refresh, settings, summary }: SettingsProps): Rea
         refresh={refresh}
         settings={settings}
       />
+      <ReviewPanel key={String(settings.resetCodeOnReview)} refresh={refresh} settings={settings} />
       <BackupPanel refresh={refresh} />
       <DataOverview settings={settings} summary={summary} />
       <DangerZone refresh={refresh} />
@@ -76,6 +77,68 @@ function ReminderPanel({ notice, onNotice, refresh, settings }: { readonly notic
       </div>
     </Panel>
   );
+}
+
+function ReviewPanel({
+  refresh,
+  settings,
+}: {
+  readonly refresh: () => Promise<void>;
+  readonly settings: Settings;
+}): React.ReactElement {
+  const [enabled, setEnabled] = useState(settings.resetCodeOnReview);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  return (
+    <Panel title="复习">
+      <div className="settings-form">
+        <SettingRow
+          description="仅从首页或待处理队列打开今日/逾期题目时生效，自动点击力扣的「还原到默认的代码模板」。历史提交仍保留在力扣中。"
+          label="打开复习题时还原代码模板"
+        >
+          <label className="switch">
+            <input
+              aria-label="打开复习题时还原代码模板"
+              checked={enabled}
+              disabled={saving}
+              onChange={(event) => void persistReviewResetSetting({
+                next: event.target.checked,
+                refresh,
+                setEnabled,
+                setNotice,
+                setSaving,
+              })}
+              type="checkbox"
+            />
+            <span />
+          </label>
+        </SettingRow>
+        {notice && <InlineNotice tone={notice.tone}>{notice.text}</InlineNotice>}
+      </div>
+    </Panel>
+  );
+}
+
+async function persistReviewResetSetting(options: {
+  readonly next: boolean;
+  readonly refresh: () => Promise<void>;
+  readonly setEnabled: (value: boolean) => void;
+  readonly setNotice: (notice: Notice | null) => void;
+  readonly setSaving: (value: boolean) => void;
+}): Promise<void> {
+  const { next, refresh, setEnabled, setNotice, setSaving } = options;
+  setSaving(true);
+  setNotice(null);
+  setEnabled(next);
+  try {
+    await sendExtensionRequest({ type: 'settings.update', payload: { resetCodeOnReview: next } });
+    await refresh();
+  } catch (cause) {
+    setEnabled(!next);
+    setNotice(toErrorNotice(cause, '复习设置保存失败'));
+  } finally {
+    setSaving(false);
+  }
 }
 
 function BackupPanel({ refresh }: { readonly refresh: () => Promise<void> }): React.ReactElement {

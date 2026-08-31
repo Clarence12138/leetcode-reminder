@@ -105,6 +105,7 @@ export const settingsSchema = z
     reminderMinute: z.number().int().min(0).max(59),
     timezone: z.string().min(1),
     schemaVersion: z.literal(CURRENT_SCHEMA_VERSION),
+    resetCodeOnReview: z.boolean().default(false),
   })
   .strict();
 

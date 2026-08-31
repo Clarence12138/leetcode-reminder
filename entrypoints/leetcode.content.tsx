@@ -5,20 +5,30 @@ import { LeetCodeCnClient } from '../src/leetcode/api-client';
 import { readCookieValue } from '../src/leetcode/cookies';
 import { ContentController } from '../src/leetcode/content-controller';
 import { SubmissionDetector, type DetectorRoute } from '../src/leetcode/detector';
-import { extractProblemSlug, extractSubmissionRoute } from '../src/leetcode/url';
+import { resetEditorToDefaultTemplate } from '../src/leetcode/code-reset';
+import {
+  captureReviewResetIntent,
+  clearReviewResetIntent,
+  extractProblemSlug,
+  extractSubmissionRoute,
+  hasReviewResetIntent,
+} from '../src/leetcode/url';
 import { isSubmitShortcut } from '../src/leetcode/shortcut';
 import '../src/leetcode/content.css';
 
 const SUBMIT_SELECTOR = '[data-e2e-locator="console-submit-button"]';
+const HINT_DISMISS_MS = 2_800;
 
 export default defineContentScript({
   matches: ['https://leetcode.cn/problems/*'],
   runAt: 'document_start',
   cssInjectionMode: 'ui',
   async main(ctx) {
+    captureReviewResetIntent(window.location.href, sessionStorage, history);
     const controller = new ContentController();
     const detector = createDetector(controller);
     controller.setRetryHandler(() => detector.retryLast());
+    startReviewCodeReset(controller, window.location.href);
 
     const ui = await createShadowRootUi(ctx, {
       name: 'xiaoshuaji-review-ui',
@@ -42,6 +52,7 @@ export default defineContentScript({
     ctx.addEventListener(window, 'keydown', (event) => handleSubmitShortcut(event, detector), true);
     ctx.addEventListener(window, 'wxt:locationchange', ({ newUrl }) => {
       detector.updateRoute(toDetectorRoute(newUrl));
+      startReviewCodeReset(controller, newUrl.href);
     });
     detector.updateRoute(toDetectorRoute(window.location));
   },
@@ -69,6 +80,24 @@ function toDetectorRoute(location: Pick<Location, 'pathname'>): DetectorRoute {
     slug: extractProblemSlug(location),
     submissionId: submission?.submissionId ?? null,
   };
+}
+
+let codeResetStarted = false;
+
+function startReviewCodeReset(controller: ContentController, href: string): void {
+  captureReviewResetIntent(href, sessionStorage, history);
+  const slug = extractProblemSlug(new URL(href, 'https://leetcode.cn'));
+  if (!slug || !hasReviewResetIntent(slug, sessionStorage) || codeResetStarted) return;
+  codeResetStarted = true;
+  void performCodeReset(controller, slug);
+}
+
+async function performCodeReset(controller: ContentController, slug: string): Promise<void> {
+  controller.showHint('正在还原默认代码模板…');
+  const ok = await resetEditorToDefaultTemplate();
+  clearReviewResetIntent(slug, sessionStorage);
+  controller.showHint(ok ? '已还原为默认代码模板' : '未能自动还原，请手动点击编辑器右上角圆形还原按钮');
+  window.setTimeout(() => controller.dismissHint(), HINT_DISMISS_MS);
 }
 
 function handleSubmitClick(event: Event, detector: SubmissionDetector): void {

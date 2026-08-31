@@ -1,5 +1,6 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 import type { ProblemRecord, SubmissionReview } from '../../../src/domain/types';
+import { withReviewResetIntent } from '../../../src/leetcode/url';
 import { DifficultyBadge } from '../../../src/ui/components';
 import { formatDateTime, formatDue, problemName } from '../../../src/ui/format';
 import { Icon } from '../../../src/ui/Icon';
@@ -13,14 +14,23 @@ export function Panel({ children, className = '', title, action }: PropsWithChil
   );
 }
 
-export function ProblemRow({ problem, compact = false }: { readonly compact?: boolean; readonly problem: ProblemRecord }): React.ReactElement {
+export function ProblemRow({
+  compact = false,
+  problem,
+  reviewJump = false,
+}: {
+  readonly compact?: boolean;
+  readonly problem: ProblemRecord;
+  readonly reviewJump?: boolean;
+}): React.ReactElement {
   const dueLabel = formatDue(problem.nextReviewAt);
   const isOverdue = dueLabel.startsWith('逾期') || dueLabel === '昨天到期';
+  const href = reviewJump ? withReviewResetIntent(problem.url) : problem.url;
   return (
     <article className="problem-row">
       <span className="problem-row__number">{problem.frontendId}</span>
       <div className="problem-row__main">
-        <a href={problem.url} rel="noreferrer" target="_blank">{problem.title} <Icon name="external" size={13} /></a>
+        <a href={href} rel="noreferrer" target="_blank">{problem.title} <Icon name="external" size={13} /></a>
         {!compact && <span className="tag-line">{problem.tags.slice(0, 3).map((tag) => <i key={tag}>{tag}</i>)}</span>}
       </div>
       <DifficultyBadge difficulty={problem.difficulty} />

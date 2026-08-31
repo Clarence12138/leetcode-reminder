@@ -111,6 +111,7 @@ export function createDefaultSettings(timezone = systemTimezone()): Settings {
     reminderMinute: DEFAULT_REMINDER_MINUTE,
     timezone,
     schemaVersion: CURRENT_SCHEMA_VERSION,
+    resetCodeOnReview: false,
   };
 }
 

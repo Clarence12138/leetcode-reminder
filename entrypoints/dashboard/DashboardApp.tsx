@@ -42,12 +42,13 @@ function DashboardContent({ data, error, refresh, view }: { readonly data: Dashb
     return <div className="dashboard-error"><InlineNotice tone="error">{error ?? '未知错误'}</InlineNotice><Button onClick={() => void refresh()}>重试</Button></div>;
   }
   const props = { summary: data.summary, refresh };
-  if (view === 'queue') return <QueueView {...props} />;
+  const resetCodeOnReview = data.settings.resetCodeOnReview;
+  if (view === 'queue') return <QueueView {...props} resetCodeOnReview={resetCodeOnReview} />;
   if (view === 'problems') return <ProblemsView {...props} />;
   if (view === 'history') return <HistoryView summary={data.summary} />;
   if (view === 'issues') return <IssuesView {...props} />;
   if (view === 'settings') return <SettingsView {...props} settings={data.settings} />;
-  return <HomeView summary={data.summary} onNavigate={setViewHash} />;
+  return <HomeView onNavigate={setViewHash} resetCodeOnReview={resetCodeOnReview} summary={data.summary} />;
 }
 
 function Sidebar({ current, data, onNavigate }: { readonly current: ViewKey; readonly data: DashboardData | null; readonly onNavigate: (view: ViewKey) => void }): React.ReactElement {

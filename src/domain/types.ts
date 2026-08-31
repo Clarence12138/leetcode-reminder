@@ -82,6 +82,7 @@ export interface Settings {
   readonly reminderMinute: number;
   readonly timezone: string;
   readonly schemaVersion: number;
+  readonly resetCodeOnReview: boolean;
 }
 
 export interface DailySummary {

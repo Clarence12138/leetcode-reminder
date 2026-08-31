@@ -5,6 +5,7 @@ import { sendExtensionRequest } from '../shared/messaging';
 
 export type ContentNotice =
   | { readonly kind: 'idle' }
+  | { readonly kind: 'hint'; readonly text: string }
   | { readonly kind: 'monitoring' }
   | {
       readonly kind: 'rating';
@@ -46,11 +47,20 @@ export class ContentController {
   }
 
   setMonitoring(monitoring: boolean): void {
-    if (monitoring && this.notice.kind === 'idle') {
+    if (monitoring && (this.notice.kind === 'idle' || this.notice.kind === 'hint')) {
       this.update({ kind: 'monitoring' });
     } else if (!monitoring && this.notice.kind === 'monitoring') {
       this.update({ kind: 'idle' });
     }
+  }
+
+  showHint(text: string): void {
+    if (this.notice.kind !== 'idle' && this.notice.kind !== 'hint') return;
+    this.update({ kind: 'hint', text });
+  }
+
+  dismissHint(): void {
+    if (this.notice.kind === 'hint') this.update({ kind: 'idle' });
   }
 
   async handleAccepted(submission: AcceptedSubmission): Promise<void> {

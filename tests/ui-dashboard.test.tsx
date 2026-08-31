@@ -27,6 +27,7 @@ const settings: Settings = {
   reminderMinute: 0,
   timezone: 'Asia/Shanghai',
   schemaVersion: 1,
+  resetCodeOnReview: false,
 };
 
 describe('完整面板', () => {
@@ -158,6 +159,40 @@ describe('完整面板', () => {
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'notification.test' }));
     expect(await screen.findByText(/Chrome 通知 API 已成功创建/)).toBeInTheDocument();
     expect(screen.getByText(/系统是否展示取决于/)).toBeInTheDocument();
+  });
+
+  it('可开关打开复习题时还原代码模板', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    render(<SettingsView refresh={refresh} settings={settings} summary={summary} />);
+    fireEvent.click(screen.getByLabelText('打开复习题时还原代码模板'));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
+      type: 'settings.update',
+      payload: { resetCodeOnReview: true },
+    }));
+    await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+  });
+
+  it('开启还原后只给队列和首页复习链接加上标记', () => {
+    const { unmount } = render(<QueueView refresh={vi.fn()} resetCodeOnReview summary={summary} />);
+    expect(screen.getByRole('link', { name: /两数之和/ })).toHaveAttribute(
+      'href',
+      'https://leetcode.cn/problems/1/?xiaoshuaji=review',
+    );
+    unmount();
+
+    render(<HomeView onNavigate={vi.fn()} resetCodeOnReview summary={summary} />);
+    expect(screen.getByRole('link', { name: /两数之和/ })).toHaveAttribute(
+      'href',
+      'https://leetcode.cn/problems/1/?xiaoshuaji=review',
+    );
+  });
+
+  it('题库链接即使在复习队列之外也不带还原标记', () => {
+    render(<ProblemsView refresh={vi.fn()} summary={summary} />);
+    expect(screen.getAllByRole('link', { name: /两数之和/ })[0]).toHaveAttribute(
+      'href',
+      'https://leetcode.cn/problems/1/',
+    );
   });
 
   it('异常页支持单条已读、批量解决，并在请求期间禁用操作', async () => {

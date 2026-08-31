@@ -7,7 +7,15 @@ import { Icon } from '../../../src/ui/Icon';
 import { RatingButtons } from '../../../src/ui/rating';
 import { Panel, ProblemRow } from './ViewParts';
 
-export function QueueView({ summary, refresh }: { readonly refresh: () => Promise<void>; readonly summary: DailySummary }): React.ReactElement {
+export function QueueView({
+  refresh,
+  resetCodeOnReview = false,
+  summary,
+}: {
+  readonly refresh: () => Promise<void>;
+  readonly resetCodeOnReview?: boolean;
+  readonly summary: DailySummary;
+}): React.ReactElement {
   const problemMap = new Map(summary.problems.map((problem) => [problem.problemId, problem]));
   const dueProblems = [...summary.dueProblems].sort(compareDueDate);
   return (
@@ -26,7 +34,7 @@ export function QueueView({ summary, refresh }: { readonly refresh: () => Promis
       <Panel title={`今日 / 逾期 · ${dueProblems.length}`}>
         {dueProblems.length === 0
           ? <EmptyState description="目前没有需要复习的题目。下次到期后，我会在每日提醒中告诉你。" icon="sparkle" title="队列已清空" />
-          : <div className="rows due-rows">{dueProblems.map((problem) => <ProblemRow key={problem.problemId} problem={problem} />)}</div>}
+          : <div className="rows due-rows">{dueProblems.map((problem) => <ProblemRow key={problem.problemId} problem={problem} reviewJump={resetCodeOnReview} />)}</div>}
       </Panel>
     </div>
   );
