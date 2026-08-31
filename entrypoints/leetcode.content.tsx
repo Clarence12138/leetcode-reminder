@@ -6,6 +6,7 @@ import { readCookieValue } from '../src/leetcode/cookies';
 import { ContentController } from '../src/leetcode/content-controller';
 import { SubmissionDetector, type DetectorRoute } from '../src/leetcode/detector';
 import { resetEditorToDefaultTemplate } from '../src/leetcode/code-reset';
+import { coverEditorCode } from '../src/leetcode/editor-cover';
 import {
   captureReviewResetIntent,
   clearReviewResetIntent,
@@ -89,7 +90,8 @@ function startReviewCodeReset(controller: ContentController, href: string): void
   const slug = extractProblemSlug(new URL(href, 'https://leetcode.cn'));
   if (!slug || !hasReviewResetIntent(slug, sessionStorage) || codeResetStarted) return;
   codeResetStarted = true;
-  void performCodeReset(controller, slug);
+  const uncover = coverEditorCode();
+  void performCodeReset(controller, slug).finally(uncover);
 }
 
 async function performCodeReset(controller: ContentController, slug: string): Promise<void> {

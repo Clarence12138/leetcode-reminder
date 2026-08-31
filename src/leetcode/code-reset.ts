@@ -11,6 +11,8 @@ const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_SETTLE_MS = 600;
 const DEFAULT_INTERVAL_MS = 150;
 const CONFIRM_TIMEOUT_MS = 3_000;
+const DEFAULT_APPLY_SETTLE_MS = 400;
+const DEFAULT_APPLY_TIMEOUT_MS = 1_500;
 
 export interface CodeResetClock {
   readonly now: () => number;
@@ -24,7 +26,16 @@ export interface CodeResetOptions {
   readonly intervalMs?: number;
   readonly confirmTimeoutMs?: number;
   readonly editorTimeoutMs?: number;
+  readonly applySettleMs?: number;
+  readonly applyTimeoutMs?: number;
   readonly clock?: CodeResetClock;
+}
+
+interface ResetSession {
+  readonly root: ParentNode;
+  readonly clock: CodeResetClock;
+  readonly options: CodeResetOptions;
+  readonly intervalMs: number;
 }
 
 const defaultClock: CodeResetClock = {
@@ -45,25 +56,62 @@ export async function resetEditorToDefaultTemplate(
 }
 
 async function runReset(options: CodeResetOptions): Promise<boolean> {
-  const root = options.root ?? document;
-  const clock = options.clock ?? defaultClock;
-  const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS;
-  const resetButton = await waitFor(() => findResetButton(root), {
+  const session = createSession(options);
+  const resetButton = await waitFor(() => findResetButton(session.root), {
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-    intervalMs,
-    clock,
+    intervalMs: session.intervalMs,
+    clock: session.clock,
   });
   if (!resetButton) return false;
-  await waitForEditor(root, options, clock);
-  await clock.sleep(options.settleMs ?? DEFAULT_SETTLE_MS);
+  await waitForEditor(session.root, options, session.clock);
+  await session.clock.sleep(options.settleMs ?? DEFAULT_SETTLE_MS);
+  const before = readEditorText(session.root);
+  await clickResetAndConfirm(resetButton, session);
+  await waitForTemplateApplied(before, session);
+  return true;
+}
+
+function createSession(options: CodeResetOptions): ResetSession {
+  return {
+    root: options.root ?? document,
+    clock: options.clock ?? defaultClock,
+    options,
+    intervalMs: options.intervalMs ?? DEFAULT_INTERVAL_MS,
+  };
+}
+
+async function clickResetAndConfirm(resetButton: HTMLElement, session: ResetSession): Promise<void> {
   resetButton.click();
-  const confirmButton = await waitFor(() => findConfirmButton(root), {
-    timeoutMs: options.confirmTimeoutMs ?? CONFIRM_TIMEOUT_MS,
-    intervalMs,
-    clock,
+  const confirmButton = await waitFor(() => findConfirmButton(session.root), {
+    timeoutMs: session.options.confirmTimeoutMs ?? CONFIRM_TIMEOUT_MS,
+    intervalMs: session.intervalMs,
+    clock: session.clock,
   });
   confirmButton?.click();
-  return true;
+}
+
+async function waitForTemplateApplied(before: string | null, session: ResetSession): Promise<void> {
+  const settleMs = session.options.applySettleMs ?? DEFAULT_APPLY_SETTLE_MS;
+  if (settleMs > 0) await session.clock.sleep(settleMs);
+  const timeoutMs = session.options.applyTimeoutMs ?? DEFAULT_APPLY_TIMEOUT_MS;
+  if (before === null || timeoutMs <= 0) return;
+  await waitFor(() => changedEditorText(session.root, before), {
+    timeoutMs,
+    intervalMs: session.intervalMs,
+    clock: session.clock,
+  });
+}
+
+function changedEditorText(root: ParentNode, before: string): string | null {
+  const after = readEditorText(root);
+  if (after === null || after === before) return null;
+  return after;
+}
+
+function readEditorText(root: ParentNode): string | null {
+  const lines = root.querySelector('.monaco-editor .view-lines');
+  if (!lines) return null;
+  return lines.textContent ?? '';
 }
 
 async function waitForEditor(

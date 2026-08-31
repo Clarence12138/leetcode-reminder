@@ -93,7 +93,7 @@ function ReviewPanel({
     <Panel title="复习">
       <div className="settings-form">
         <SettingRow
-          description="仅从首页或待处理队列打开今日/逾期题目时生效，自动点击力扣的「还原到默认的代码模板」。历史提交仍保留在力扣中。"
+          description="仅从首页或待处理队列打开今日/逾期题目时生效。打开后会先遮住编辑器再还原，避免看到上次写的代码。历史提交仍保留在力扣中。"
           label="打开复习题时还原代码模板"
         >
           <label className="switch">

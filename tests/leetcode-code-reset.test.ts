@@ -10,7 +10,7 @@ describe('resetEditorToDefaultTemplate', () => {
     const clicks: string[] = [];
     document.body.append(iconResetButton(() => {
       clicks.push('reset');
-      document.body.append(resetConfirmDialog(clicks));
+      document.body.append(resetConfirmDialog({ clicks }));
     }));
 
     await expect(resetEditorToDefaultTemplate(fastOptions())).resolves.toBe(true);
@@ -21,7 +21,7 @@ describe('resetEditorToDefaultTemplate', () => {
     const reset = document.createElement('button');
     reset.setAttribute('aria-label', '还原到默认的代码模版');
     reset.addEventListener('click', () => {
-      document.body.append(resetConfirmDialog());
+      document.body.append(resetConfirmDialog({}));
     });
     document.body.append(reset);
 
@@ -64,6 +64,21 @@ describe('resetEditorToDefaultTemplate', () => {
     await expect(resetEditorToDefaultTemplate(fastOptions({ confirmTimeoutMs: 20 }))).resolves.toBe(true);
     expect(clicks).toEqual([]);
   });
+
+  it('确认还原后等到编辑器内容变成模板', async () => {
+    const viewLines = monacoViewLines('old solution');
+    document.body.append(viewLines.editor);
+    document.body.append(iconResetButton(() => {
+      document.body.append(resetConfirmDialog({
+        onConfirm: () => {
+          viewLines.viewLines.textContent = 'class Solution {}';
+        },
+      }));
+    }));
+
+    await expect(resetEditorToDefaultTemplate(fastOptions({ applyTimeoutMs: 200 }))).resolves.toBe(true);
+    expect(viewLines.viewLines.textContent).toBe('class Solution {}');
+  });
 });
 
 function iconResetButton(onClick?: () => void): HTMLButtonElement {
@@ -75,22 +90,41 @@ function iconResetButton(onClick?: () => void): HTMLButtonElement {
   return reset;
 }
 
-function resetConfirmDialog(clicks?: string[]): HTMLDivElement {
+function resetConfirmDialog(options: {
+  readonly clicks?: string[];
+  readonly onConfirm?: () => void;
+} = {}): HTMLDivElement {
   const dialog = document.createElement('div');
   dialog.innerHTML = '<h3>操作确认</h3><div>您将放弃所有更改并初始化代码！</div><button type="button">取消</button><button type="button">确认</button>';
-  if (clicks) {
-    dialog.addEventListener('click', (event) => {
-      if (event.target instanceof HTMLButtonElement) clicks.push(event.target.textContent ?? '');
-    });
-  }
+  dialog.addEventListener('click', (event) => {
+    if (!(event.target instanceof HTMLButtonElement)) return;
+    options.clicks?.push(event.target.textContent ?? '');
+    if (event.target.textContent === '确认') options.onConfirm?.();
+  });
   return dialog;
 }
 
-function fastOptions(overrides: { readonly timeoutMs?: number; readonly confirmTimeoutMs?: number } = {}) {
+function monacoViewLines(text: string): { readonly editor: HTMLDivElement; readonly viewLines: HTMLDivElement } {
+  const editor = document.createElement('div');
+  editor.className = 'monaco-editor';
+  const viewLines = document.createElement('div');
+  viewLines.className = 'view-lines';
+  viewLines.textContent = text;
+  editor.append(viewLines);
+  return { editor, viewLines };
+}
+
+function fastOptions(overrides: {
+  readonly timeoutMs?: number;
+  readonly confirmTimeoutMs?: number;
+  readonly applyTimeoutMs?: number;
+} = {}) {
   let now = 0;
   return {
     settleMs: 0,
     editorTimeoutMs: 0,
+    applySettleMs: 0,
+    applyTimeoutMs: overrides.applyTimeoutMs ?? 0,
     intervalMs: 5,
     timeoutMs: overrides.timeoutMs ?? 200,
     confirmTimeoutMs: overrides.confirmTimeoutMs ?? 200,
