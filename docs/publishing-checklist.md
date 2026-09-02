@@ -34,7 +34,7 @@
 - [ ] `pnpm build` 与 `pnpm zip` 通过。
 - [ ] `node scripts/validate-package.mjs <精确 ZIP 路径>` 通过。
 - [ ] 在干净 Chrome Profile 中加载 `.output/chrome-mv3/`。
-- [ ] 按 README 的“真实账号验收”逐项检查。
+- [ ] 用已登录的力扣中文站普通题目页做一次真实提交流程检查：Wrong Answer / 超时不记账；点击提交和 `Command/Ctrl + Enter` 的 Accepted 都出现四档评分；相同提交 ID 不重复；关闭评分框后进入待评估且无到期时间；选择“不记录本次”或丢弃后不进队列；退出登录有明确提示；接口异常进入检测异常；点击系统通知打开正确队列。
 - [ ] 检查弹窗、完整面板、页内评分框在 100% 与 125% 缩放下可用。
 
 ## 4. 隐私政策

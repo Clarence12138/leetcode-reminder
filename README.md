@@ -4,6 +4,8 @@
 
 > 当前版本只支持已登录用户的 `leetcode.cn/problems/*` 普通题目页。扩展不会保存提交代码、Cookie、账号凭据，也不包含遥测或远程代码。
 
+本项目完整开源，并认可 [LINUX DO](https://linux.do) 社区。
+
 ## 功能
 
 - 识别点击“提交”、macOS `Command + Enter`、Windows/Linux `Ctrl + Enter`。
@@ -48,7 +50,8 @@ node scripts/validate-package.mjs
 2. 打开 `chrome://extensions`，启用“开发者模式”。
 3. 点击“加载已解压的扩展程序”，选择 `.output/chrome-mv3/`；如已加载，点击扩展卡片上的“重新加载”。
 4. 刷新已打开的力扣题目页，确保 content script 更新为本次构建。
-5. 登录力扣中文站，进入普通题目页进行真实账号验收。
+
+更完整的发布前步骤见[上架清单](docs/publishing-checklist.md)，商店文案见[商店详情](docs/store-listing.md)。
 
 ## 使用方式
 
@@ -84,18 +87,6 @@ node scripts/validate-package.mjs
 - “合并导入”会跳过内容一致的相同提交；发现冲突会中止整次导入。
 - “覆盖恢复”会替换现有数据，必须在界面中二次确认。
 - 导入前会完整校验；排期会根据评分历史重建，不信任备份中的缓存排期。
-
-## 真实账号验收
-
-- “运行”、Wrong Answer、超时等结果均不产生 Accepted 记录。
-- 点击提交和 `Command/Ctrl + Enter` 的 Accepted 均出现四档评分。
-- 相同提交 ID 不重复；再次 Accepted 生成新的复习事件。
-- 关闭评分框后记录进入“待评估”，且不会产生到期时间。
-- 选择“不记录本次”或在待评估中丢弃后，该提交不会进入队列，也不会改动已有排期。
-- 退出登录后出现明确登录提示；接口异常进入“检测异常”。
-- 点击系统通知后打开正确的待复习队列。
-
-更完整的发布前步骤见[上架清单](docs/publishing-checklist.md)，商店文案见[商店详情](docs/store-listing.md)。
 
 ## 项目边界
 
