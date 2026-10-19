@@ -41,7 +41,11 @@
 
 ### `storage`
 
-保存通知设置、提醒幂等状态，以及本机复习数据的必要配置。长期题目、提交和复习日志保存在扩展自己的本地 IndexedDB 中，不使用 Chrome Sync。
+保存通知设置、提醒幂等状态，以及本机复习数据镜像。长期题目、提交和复习日志保存在扩展自己的本地 IndexedDB 中，并在 `chrome.storage.local` 保留一份镜像用于自动恢复，不使用 Chrome Sync。
+
+### `unlimitedStorage`
+
+让扩展本地的 IndexedDB 复习数据不因浏览器存储空间紧张而被自动回收，并在 `chrome.storage.local` 中保存一份本机数据镜像，用于 IndexedDB 被清理后自动恢复。数据仍只保存在本机，不上传。
 
 ### `alarms`
 

@@ -62,9 +62,9 @@
 
 - [ ] 工作流上传 `.output/xiaoshuaji-leetcode-review-<version>-chrome.zip`，且校验与上传使用同一个精确路径。
 - [ ] ZIP 根目录包含 `manifest.json`，Manifest 版本为 3。
-- [ ] 权限仅为 `storage`、`alarms`、`notifications`。
+- [ ] 权限仅为 `storage`、`unlimitedStorage`、`alarms`、`notifications`。
 - [ ] 主机权限仅为 `https://leetcode.cn/*`。
-- [ ] 不包含 `tabs`、`cookies`、`downloads`、`webRequest`、`unlimitedStorage`。
+- [ ] 不包含 `tabs`、`cookies`、`downloads`、`webRequest`。
 - [ ] 不包含远程脚本、动态下载代码、模拟 Accepted 或测试后门。
 - [ ] 版本号高于上一次商店版本。
 

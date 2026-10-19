@@ -74,11 +74,12 @@ node scripts/validate-package.mjs
 | 权限 | 用途 |
 | --- | --- |
 | `storage` | 保存设置、提醒状态和本地复习数据 |
+| `unlimitedStorage` | 避免本地复习数据因存储空间紧张被浏览器回收，并存放本机数据镜像 |
 | `alarms` | 安排每天一次的本地提醒检查 |
 | `notifications` | 展示到期题目与待评估汇总 |
 | `https://leetcode.cn/*` | 在题目页读取当前题目元数据与判题结果 |
 
-扩展不申请 `tabs`、`cookies`、`downloads`、`webRequest` 或 `unlimitedStorage`。完整说明见[隐私政策](docs/privacy.html)。
+扩展不申请 `tabs`、`cookies`、`downloads` 或 `webRequest`。完整说明见[隐私政策](docs/privacy.html)。
 读取中文题目信息时，扩展会临时读取当前页面可见的 `csrftoken`，仅用于 GraphQL 的同源 `X-CSRFToken` 请求头；不会写入存储、备份或日志，也不会发送给开发者或第三方。
 
 ### 备份与恢复
@@ -87,6 +88,7 @@ node scripts/validate-package.mjs
 - “合并导入”会跳过内容一致的相同提交；发现冲突会中止整次导入。
 - “覆盖恢复”会替换现有数据，必须在界面中二次确认。
 - 导入前会完整校验；排期会根据评分历史重建，不信任备份中的缓存排期。
+- 每次数据变更后，扩展会在 `chrome.storage.local` 中保存一份本机镜像；启动时若发现 IndexedDB 为空而镜像有数据，会自动恢复。镜像与扩展一同在卸载时删除，不能替代手动导出的 JSON 备份。
 
 ## 项目边界
 
