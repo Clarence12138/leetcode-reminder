@@ -4,6 +4,7 @@ import {
   BACKUP_FORMAT,
   BACKUP_SCHEMA_VERSION,
   CURRENT_SCHEMA_VERSION,
+  DATA_MIRROR_FORMAT,
   LEGACY_BACKUP_FORMAT,
 } from './constants';
 import type { BackupV2 } from './types';
@@ -141,6 +142,16 @@ export const backupV2Schema = z
     }),
     schemaVersion: z.literal(BACKUP_SCHEMA_VERSION),
     settings: settingsSchema,
+    problems: z.array(problemRecordSchema),
+    submissions: z.array(submissionReviewSchema),
+    issues: z.array(detectionIssueSchema),
+  })
+  .strict();
+
+export const dataMirrorSchema = z
+  .object({
+    format: z.literal(DATA_MIRROR_FORMAT),
+    savedAt: timestampSchema,
     problems: z.array(problemRecordSchema),
     submissions: z.array(submissionReviewSchema),
     issues: z.array(detectionIssueSchema),

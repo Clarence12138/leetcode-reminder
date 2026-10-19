@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
 
-const EXPECTED_PERMISSIONS = Object.freeze(['alarms', 'notifications', 'storage']);
+const EXPECTED_PERMISSIONS = Object.freeze(['alarms', 'notifications', 'storage', 'unlimitedStorage']);
 const EXPECTED_HOSTS = Object.freeze(['https://leetcode.cn/*']);
 const EXPECTED_CONTENT_MATCHES = Object.freeze(['https://leetcode.cn/problems/*']);
 const EXPECTED_DEFAULT_LOCALE = 'zh_CN';
@@ -12,7 +12,6 @@ const FORBIDDEN_PERMISSIONS = Object.freeze([
   'cookies',
   'downloads',
   'tabs',
-  'unlimitedStorage',
   'webRequest',
   'webRequestBlocking',
 ]);

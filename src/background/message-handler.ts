@@ -3,6 +3,7 @@ import { parseExtensionRequest } from '../domain/schemas';
 import type { Difficulty } from '../domain/types';
 import type { BackupManager } from './backup';
 import { toPublicError } from './errors';
+import type { DataMirror } from './mirror';
 import type { ReminderCoordinator } from './reminders';
 import type { SettingsRepository } from './settings';
 import type { DashboardFilter, ReviewStore } from './store';
@@ -12,13 +13,24 @@ export interface BackgroundServices {
   readonly settings: SettingsRepository;
   readonly backups: BackupManager;
   readonly reminders: ReminderCoordinator;
+  readonly mirror?: DataMirror;
 }
+
+const READ_ONLY_REQUESTS: ReadonlySet<ExtensionRequest['type']> = new Set([
+  'review.preview',
+  'dashboard.query',
+  'settings.get',
+  'settings.update',
+  'backup.export',
+  'notification.test',
+]);
 
 export function createMessageHandler(services: BackgroundServices) {
   return async (rawRequest: unknown): Promise<ExtensionResponse> => {
     try {
       const request = parseExtensionRequest(rawRequest) as ExtensionRequest;
       const data = await dispatchRequest(request, services);
+      if (!READ_ONLY_REQUESTS.has(request.type)) await syncMirror(services.mirror);
       return data === undefined ? { ok: true } : { ok: true, data };
     } catch (error) {
       return { ok: false, error: toPublicError(error) };
@@ -102,6 +114,15 @@ async function dispatchMaintenanceRequest(
     }
     default:
       return assertNever(request);
+  }
+}
+
+async function syncMirror(mirror: DataMirror | undefined): Promise<void> {
+  // 主数据已写入成功，镜像失败只记录，不让本次请求失败。
+  try {
+    await mirror?.sync();
+  } catch (error) {
+    console.error('[小刷记] 同步本地数据镜像失败', error);
   }
 }
 

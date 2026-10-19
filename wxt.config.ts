@@ -9,7 +9,7 @@ export default defineConfig({
     name: '__MSG_extensionName__',
     description: '__MSG_extensionDescription__',
     default_locale: 'zh_CN',
-    permissions: ['storage', 'alarms', 'notifications'],
+    permissions: ['storage', 'unlimitedStorage', 'alarms', 'notifications'],
     host_permissions: ['https://leetcode.cn/*'],
     action: {
       default_title: '__MSG_extensionName__',
