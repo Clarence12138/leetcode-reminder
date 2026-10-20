@@ -101,6 +101,35 @@ describe('Chrome Web Store API v2 client', () => {
     );
   });
 
+  it('explains INVALID_ITEM_METADATA in Chinese with the dashboard link', async () => {
+    const editUrl = 'https://chrome.google.com/webstore/devconsole/publisher-id/extension-id/edit';
+    const details = [
+      { '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'INVALID_ITEM_METADATA' },
+      { '@type': 'type.googleapis.com/google.rpc.Help', links: [{ description: 'Edit Item Link', url: editUrl }] },
+    ];
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(
+      { error: { code: 400, message: 'Your submission does not meet the requirements', details } },
+      { status: 400, statusText: 'Bad Request' },
+    ));
+    const client = createChromeWebStoreClient(BASE_CONFIG, { fetchImpl });
+
+    const error = await client.fetchStatus().catch((cause) => cause);
+
+    expect(error.message.split('\n')[0]).toMatch(/^提示：商店条目信息不满足提交要求.*隐私权/);
+    expect(error.message).toContain(`后台编辑页：${editUrl}`);
+    expect(error.message).toContain('Your submission does not meet the requirements');
+  });
+
+  it('adds no hint for reasons without a known explanation', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(
+      { error: { code: 400, message: 'Invalid package', details: [{ reason: 'VERSION_NOT_INCREASED' }] } },
+      { status: 400, statusText: 'Bad Request' },
+    ));
+    const client = createChromeWebStoreClient(BASE_CONFIG, { fetchImpl });
+
+    await expect(client.fetchStatus()).rejects.toThrow(/^Chrome Web Store API request failed/);
+  });
+
   it.each(['FAILED', 'NOT_FOUND'])('fails when upload state is %s', async (uploadState) => {
     const { client } = createClient([{ uploadState }]);
 

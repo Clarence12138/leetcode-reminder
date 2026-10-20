@@ -6,6 +6,13 @@ const DEFAULT_UPLOAD_TIMEOUT_MS = 300_000;
 const POLL_INTERVAL_MS = 5_000;
 const PACKAGE_JSON_PATH = fileURLToPath(new URL('../package.json', import.meta.url));
 
+// 按 API 错误 reason 给出可操作的中文提示，原始错误载荷仍会完整输出。
+const ERROR_HINTS = Object.freeze({
+  INVALID_ITEM_METADATA:
+    '商店条目信息不满足提交要求：通常是新增或变更的权限尚未在开发者后台「隐私权」页填写理由，或其他必填信息缺失。'
+    + '请按后台提示补全并保存草稿，再用 workflow_dispatch（mode=publish，tag 填同一版本）重新发布，无需修改版本号。',
+});
+
 function requireEnvironmentValue(environment, name) {
   const value = environment[name]?.trim();
   if (!value) {
@@ -62,6 +69,19 @@ async function parseResponseBody(response) {
   }
 }
 
+function explainApiError(payload) {
+  const details = Array.isArray(payload?.error?.details) ? payload.error.details : [];
+  const hints = [...new Set(details.map((detail) => ERROR_HINTS[detail?.reason]).filter(Boolean))];
+  if (hints.length === 0) {
+    return '';
+  }
+  const links = details
+    .flatMap((detail) => (Array.isArray(detail?.links) ? detail.links : []))
+    .map((link) => link?.url)
+    .filter((url) => typeof url === 'string');
+  return [...hints.map((hint) => `提示：${hint}`), ...links.map((url) => `后台编辑页：${url}`)].join('\n') + '\n';
+}
+
 async function requestJson(fetchImpl, accessToken, url, init = {}) {
   const response = await fetchImpl(url, {
     ...init,
@@ -73,7 +93,7 @@ async function requestJson(fetchImpl, accessToken, url, init = {}) {
   const payload = await parseResponseBody(response);
   if (!response.ok) {
     throw new Error(
-      `Chrome Web Store API request failed (${response.status} ${response.statusText}): ${formatPayload(payload)}`,
+      `${explainApiError(payload)}Chrome Web Store API request failed (${response.status} ${response.statusText}): ${formatPayload(payload)}`,
     );
   }
   return payload;
