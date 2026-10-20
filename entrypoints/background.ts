@@ -8,6 +8,7 @@ import {
 } from '../src/background/reminders';
 import { ChromeSettingsRepository, type LocalStoragePort } from '../src/background/settings';
 import { DexieReviewStore } from '../src/background/store';
+import { isCloseHistoryTabRequest } from '../src/shared/history-port';
 
 export default defineBackground(() => {
   const database = new XiaoshuajiDatabase();
@@ -39,7 +40,8 @@ export default defineBackground(() => {
     afterReady(() => reminders.handleNotificationClick(notificationId));
   };
 
-  chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (isCloseHistoryTabRequest(request)) return closeSenderTab(sender);
     void ready.then(() => handleMessage(request)).then(sendResponse);
     return true;
   });
@@ -59,6 +61,13 @@ export default defineBackground(() => {
 
   afterReady(() => reminders.initialize());
 });
+
+/** 导入用的临时力扣标签页在面板断开后请求关闭自己。 */
+function closeSenderTab(sender: chrome.runtime.MessageSender): false {
+  const tabId = sender.tab?.id;
+  if (tabId !== undefined) void chrome.tabs.remove(tabId).catch(() => undefined);
+  return false;
+}
 
 function createChromeLocalStorage(): LocalStoragePort {
   return {

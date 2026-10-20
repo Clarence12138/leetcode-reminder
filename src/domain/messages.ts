@@ -2,6 +2,9 @@ import type {
   BackupV2,
   DailySummary,
   DetectionIssue,
+  HistoryImportResult,
+  HistoryRatingMode,
+  LeetCodeHistoryProblem,
   MasteryRating,
   ProblemMetadata,
   ReviewPreview,
@@ -62,6 +65,13 @@ export type ExtensionRequest =
       };
     }
   | {
+      readonly type: 'history.import';
+      readonly payload: {
+        readonly problems: readonly LeetCodeHistoryProblem[];
+        readonly rating: HistoryRatingMode;
+      };
+    }
+  | {
       readonly type: 'issue.record';
       readonly payload: Omit<DetectionIssue, 'id'>;
     }
@@ -107,4 +117,6 @@ export type TypedResponse<T extends ExtensionRequest['type']> =
               ? { readonly updatedCount: number }
               : T extends 'problem.delete'
                 ? { readonly deletedCount: number }
-                : unknown;
+                : T extends 'history.import'
+                  ? HistoryImportResult
+                  : unknown;

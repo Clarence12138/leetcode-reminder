@@ -14,7 +14,7 @@ const nullableTimestampSchema = timestampSchema.nullable();
 
 export const difficultySchema = z.enum(['EASY', 'MEDIUM', 'HARD']);
 export const masteryRatingSchema = z.enum(['AGAIN', 'HARD', 'GOOD', 'EASY']);
-export const submissionTriggerSchema = z.enum(['button', 'keyboard']);
+export const submissionTriggerSchema = z.enum(['button', 'keyboard', 'import']);
 
 export const problemMetadataSchema = z
   .object({
@@ -213,6 +213,32 @@ const backupImportRequestSchema = z
   })
   .strict();
 
+const historyImportRequestSchema = z
+  .object({
+    type: z.literal('history.import'),
+    payload: z
+      .object({
+        problems: z.array(
+          z
+            .object({
+              metadata: problemMetadataSchema,
+              submissions: z
+                .array(
+                  z.object({ submissionId: z.string().min(1), acceptedAt: timestampSchema }).strict(),
+                )
+                .min(1),
+            })
+            .strict(),
+        ),
+        rating: z.discriminatedUnion('mode', [
+          z.object({ mode: z.literal('uniform'), rating: masteryRatingSchema }).strict(),
+          z.object({ mode: z.literal('manual') }).strict(),
+        ]),
+      })
+      .strict(),
+  })
+  .strict();
+
 const issueRecordRequestSchema = z
   .object({
     type: z.literal('issue.record'),
@@ -273,6 +299,7 @@ export const extensionRequestSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('settings.get') }).strict(),
   z.object({ type: z.literal('backup.export') }).strict(),
   backupImportRequestSchema,
+  historyImportRequestSchema,
   issueRecordRequestSchema,
   ...issueStatusRequestSchemas,
   z.object({ type: z.literal('notification.test') }).strict(),

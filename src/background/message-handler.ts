@@ -2,6 +2,7 @@ import type { ExtensionRequest, ExtensionResponse } from '../domain/messages';
 import { parseExtensionRequest } from '../domain/schemas';
 import type { Difficulty } from '../domain/types';
 import type { BackupManager } from './backup';
+import { importLeetCodeHistory } from './history-import';
 import { toPublicError } from './errors';
 import type { DataMirror } from './mirror';
 import type { ReminderCoordinator } from './reminders';
@@ -29,9 +30,13 @@ export function createMessageHandler(services: BackgroundServices) {
   return async (rawRequest: unknown): Promise<ExtensionResponse> => {
     try {
       const request = parseExtensionRequest(rawRequest) as ExtensionRequest;
-      const data = await dispatchRequest(request, services);
-      if (!READ_ONLY_REQUESTS.has(request.type)) await syncMirror(services.mirror);
-      return data === undefined ? { ok: true } : { ok: true, data };
+      try {
+        const data = await dispatchRequest(request, services);
+        return data === undefined ? { ok: true } : { ok: true, data };
+      } finally {
+        // 即使后续步骤失败，主数据可能已经写入，镜像仍需跟上。
+        if (!READ_ONLY_REQUESTS.has(request.type)) await syncMirror(services.mirror);
+      }
     } catch (error) {
       return { ok: false, error: toPublicError(error) };
     }
@@ -93,6 +98,13 @@ async function dispatchMaintenanceRequest(
       const backup = await services.backups.import(request.payload.backup, request.payload.mode);
       await services.reminders.initialize();
       return backup;
+    }
+    case 'history.import': {
+      const { timezone } = await services.settings.get();
+      const result = await importLeetCodeHistory(services.store, { ...request.payload, timezone, now: Date.now() });
+      // 导入已提交，徽标刷新失败不应让用户误以为导入失败。
+      await services.reminders.refreshBadge().catch((error: unknown) => console.error('[小刷记] 刷新徽标失败', error));
+      return result;
     }
     case 'issue.record':
       return services.store.recordIssue(request.payload);

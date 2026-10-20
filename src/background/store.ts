@@ -68,8 +68,11 @@ export interface ReviewStore {
   deleteProblems(problemIds: readonly string[]): Promise<{ readonly deletedCount: number }>;
   clear(): Promise<void>;
   getSnapshot(): Promise<PersistedSnapshot>;
-  importSnapshot(snapshot: PersistedSnapshot, mode: 'merge' | 'replace'): Promise<void>;
+  importSnapshot(snapshot: SnapshotSource, mode: 'merge' | 'replace'): Promise<void>;
 }
+
+/** 传入函数时，会在同一事务内基于当前数据生成待导入快照。 */
+export type SnapshotSource = PersistedSnapshot | ((current: PersistedSnapshot) => PersistedSnapshot);
 
 type Replay = (reviews: readonly SubmissionReview[]) => ReplayResult;
 type Preview = (reviews: readonly SubmissionReview[], submissionId: string) => ReviewPreview;
@@ -267,10 +270,11 @@ export class DexieReviewStore implements ReviewStore {
     });
   }
 
-  async importSnapshot(snapshot: PersistedSnapshot, mode: 'merge' | 'replace'): Promise<void> {
+  async importSnapshot(snapshot: SnapshotSource, mode: 'merge' | 'replace'): Promise<void> {
     await this.db.transaction('rw', this.db.problems, this.db.submissions, this.db.issues, async () => {
       const current = await this.readSnapshotInTransaction();
-      const prepared = prepareImportedSnapshot({ current, incoming: snapshot, mode, replay: this.replay });
+      const incoming = typeof snapshot === 'function' ? snapshot(current) : snapshot;
+      const prepared = prepareImportedSnapshot({ current, incoming, mode, replay: this.replay });
       await Promise.all([
         this.db.problems.clear(),
         this.db.submissions.clear(),

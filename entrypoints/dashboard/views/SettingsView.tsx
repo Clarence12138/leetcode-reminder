@@ -5,6 +5,7 @@ import { Button, InlineNotice, PageHeading } from '../../../src/ui/components';
 import { parseTimeValue, toTimeValue } from '../../../src/ui/format';
 import { downloadJson } from '../../../src/ui/runtime';
 import { ConfirmDialog } from './ConfirmDialog';
+import { LeetCodeImportPanel } from './LeetCodeImportPanel';
 import { Panel } from './ViewParts';
 
 interface SettingsProps {
@@ -26,6 +27,7 @@ export function SettingsView({ refresh, settings, summary }: SettingsProps): Rea
         settings={settings}
       />
       <ReviewPanel key={String(settings.resetCodeOnReview)} refresh={refresh} settings={settings} />
+      <LeetCodeImportPanel refresh={refresh} summary={summary} />
       <BackupPanel refresh={refresh} />
       <DataOverview settings={settings} summary={summary} />
       <DangerZone refresh={refresh} />

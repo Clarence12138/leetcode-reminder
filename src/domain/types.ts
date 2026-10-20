@@ -1,6 +1,6 @@
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 export type MasteryRating = 'AGAIN' | 'HARD' | 'GOOD' | 'EASY';
-export type SubmissionTrigger = 'button' | 'keyboard';
+export type SubmissionTrigger = 'button' | 'keyboard' | 'import';
 
 export interface ProblemMetadata {
   readonly problemId: string;
@@ -91,6 +91,24 @@ export interface DailySummary {
   readonly pendingReviews: readonly SubmissionReview[];
   readonly recentReviews: readonly SubmissionReview[];
   readonly issues: readonly DetectionIssue[];
+}
+
+export interface LeetCodeHistoryProblem {
+  readonly metadata: ProblemMetadata;
+  readonly submissions: readonly {
+    readonly submissionId: string;
+    readonly acceptedAt: number;
+  }[];
+}
+
+export type HistoryRatingMode =
+  | { readonly mode: 'uniform'; readonly rating: MasteryRating }
+  | { readonly mode: 'manual' };
+
+export interface HistoryImportResult {
+  readonly importedProblems: number;
+  readonly importedSubmissions: number;
+  readonly skippedProblems: number;
 }
 
 export type ReviewPreview = Readonly<Record<MasteryRating, number>>;

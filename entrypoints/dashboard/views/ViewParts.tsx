@@ -1,9 +1,15 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import type { ProblemRecord, SubmissionReview } from '../../../src/domain/types';
+import type { ProblemRecord, SubmissionReview, SubmissionTrigger } from '../../../src/domain/types';
 import { withReviewResetIntent } from '../../../src/leetcode/url';
 import { DifficultyBadge } from '../../../src/ui/components';
 import { formatDateTime, formatDue, problemName } from '../../../src/ui/format';
 import { Icon } from '../../../src/ui/Icon';
+
+const triggerLabel: Readonly<Record<SubmissionTrigger, string>> = {
+  button: '按钮提交',
+  keyboard: '快捷键提交',
+  import: '从力扣导入',
+};
 
 export function Panel({ children, className = '', title, action }: PropsWithChildren<{ readonly action?: ReactNode; readonly className?: string; readonly title: string }>): React.ReactElement {
   return (
@@ -43,7 +49,7 @@ export function ReviewRow({ problem, review }: { readonly problem: ProblemRecord
   return (
     <article className="review-row">
       <span className="review-row__icon"><Icon name="check" size={15} /></span>
-      <div><strong>{problemName(problem, review)}</strong><span>{review.trigger === 'keyboard' ? '快捷键提交' : '按钮提交'}</span></div>
+      <div><strong>{problemName(problem, review)}</strong><span>{triggerLabel[review.trigger]}</span></div>
       <time>{formatDateTime(review.acceptedAt)}</time>
     </article>
   );

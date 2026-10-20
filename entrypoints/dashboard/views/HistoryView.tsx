@@ -1,7 +1,13 @@
-import type { DailySummary, MasteryRating, ProblemRecord, SubmissionReview } from '../../../src/domain/types';
+import type { DailySummary, MasteryRating, ProblemRecord, SubmissionReview, SubmissionTrigger } from '../../../src/domain/types';
 import { EmptyState, PageHeading } from '../../../src/ui/components';
 import { formatDateTime, problemName, ratingLabel } from '../../../src/ui/format';
 import { Icon } from '../../../src/ui/Icon';
+
+const historyTriggerLabel: Readonly<Record<SubmissionTrigger, string>> = {
+  button: '点击提交',
+  keyboard: 'Command / Ctrl + Enter',
+  import: '从力扣导入',
+};
 
 export function HistoryView({ summary }: { readonly summary: DailySummary }): React.ReactElement {
   const problemMap = new Map(summary.problems.map((problem) => [problem.problemId, problem]));
@@ -23,7 +29,7 @@ function HistoryItem({ problem, review }: { readonly problem: ProblemRecord | un
       <span className={`history-item__mark ${review.rating ? 'is-rated' : ''}`}><Icon name={review.rating ? 'check' : 'clock'} size={17} /></span>
       <div className="history-item__main">
         <strong>{problemName(problem, review)}</strong>
-        <span>{review.trigger === 'keyboard' ? 'Command / Ctrl + Enter' : '点击提交'} · 提交 {review.submissionId}</span>
+        <span>{historyTriggerLabel[review.trigger]} · 提交 {review.submissionId}</span>
       </div>
       <RatingPill rating={review.rating} />
       <time>{formatDateTime(review.acceptedAt)}</time>

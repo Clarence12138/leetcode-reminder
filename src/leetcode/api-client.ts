@@ -24,6 +24,17 @@ export interface LeetCodeClient {
   getProblemMetadata(slug: string, signal: AbortSignal): Promise<ProblemMetadata>;
 }
 
+export interface GraphqlRequest<T> {
+  readonly query: string;
+  readonly variables: Record<string, unknown>;
+  readonly schema: ResponseSchema<T>;
+  readonly label: string;
+}
+
+type ResponseSchema<T> = {
+  safeParse: (value: unknown) => { success: true; data: T } | { success: false; error: Error };
+};
+
 export interface LeetCodeCnClientOptions {
   readonly fetcher?: typeof fetch;
   readonly origin?: string;
@@ -63,13 +74,12 @@ export class LeetCodeCnClient implements LeetCodeClient {
   }
 
   async getProblemMetadata(slug: string, signal: AbortSignal): Promise<ProblemMetadata> {
-    const response = await this.request('/graphql/', {
-      method: 'POST',
-      signal,
-      headers: this.graphqlHeaders(),
-      body: JSON.stringify({ query: QUESTION_QUERY, variables: { titleSlug: slug } }),
-    }, '题目信息');
-    const parsed = await this.parseResponse(response, questionResponseSchema, '题目信息');
+    const parsed = await this.graphql({
+      query: QUESTION_QUERY,
+      variables: { titleSlug: slug },
+      schema: questionResponseSchema,
+      label: '题目信息',
+    }, signal);
     if (parsed.data.question.titleSlug !== slug) {
       throw new LeetCodeIntegrationError(
         'UNKNOWN_RESPONSE',
@@ -78,6 +88,16 @@ export class LeetCodeCnClient implements LeetCodeClient {
       );
     }
     return toProblemMetadata(parsed.data.question);
+  }
+
+  async graphql<T>(request: GraphqlRequest<T>, signal: AbortSignal): Promise<T> {
+    const response = await this.request('/graphql/', {
+      method: 'POST',
+      signal,
+      headers: this.graphqlHeaders(),
+      body: JSON.stringify({ query: request.query, variables: request.variables }),
+    }, request.label);
+    return this.parseResponse(response, request.schema, request.label);
   }
 
   private async request(path: string, init: RequestInit, label: string): Promise<Response> {
@@ -115,7 +135,7 @@ export class LeetCodeCnClient implements LeetCodeClient {
 
   private async parseResponse<T>(
     response: Response,
-    schema: { safeParse: (value: unknown) => { success: true; data: T } | { success: false; error: Error } },
+    schema: ResponseSchema<T>,
     label: string,
   ): Promise<T> {
     const raw = await readJson(response, label);
