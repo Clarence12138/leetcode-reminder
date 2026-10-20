@@ -39,6 +39,7 @@
         <li>提醒时间、通知开关、时区和备份格式版本；</li>
         <li>检测失败时的错误类型、发生时间和不含代码的诊断摘要。</li>
       </ul>
+      <p>当你在设置中主动点击「从力扣导入」时，扩展会临时打开一个力扣中文站标签页，读取你已通过题目的上述题目信息，以及每题 Accepted 提交的 ID 和时间，导入本地尚未记录的题目后关闭该标签页。不读取提交代码，只在你主动发起时进行。</p>
       <p>扩展不会收集姓名、邮箱、手机号、支付信息、精确位置或提交代码，也不会持久化 Cookie、访问令牌或密码。扩展不读取 Chrome 浏览历史，不跟踪你在支持页面以外的浏览活动；只有在你主动提交支持的力扣题目时，才会处理并保存当前题目地址及上述复习数据。读取中文题目信息时，扩展会临时读取当前页面可见的 <code>csrftoken</code>，仅用于发送到 <code>leetcode.cn</code> 同源 GraphQL 接口的 <code>X-CSRFToken</code> 请求头；该值不会写入存储、备份或日志，也不会发送给开发者或其他第三方。</p>
 
       <h2>2. 使用目的</h2>
@@ -57,7 +58,7 @@
         <li><code>unlimitedStorage</code>：让本地复习数据不因浏览器存储空间紧张而被自动回收，并为本机数据镜像预留空间；</li>
         <li><code>alarms</code>：在用户设定的当地时间安排提醒检查；</li>
         <li><code>notifications</code>：展示今日/逾期题目和待评估汇总；</li>
-        <li><code>https://leetcode.cn/*</code>：在支持的题目页读取题目元数据、判题结果，并完成力扣要求的同源登录与 CSRF 校验。</li>
+        <li><code>https://leetcode.cn/*</code>：在支持的题目页读取题目元数据、判题结果；在你主动「从力扣导入」时读取已通过题目和 Accepted 提交记录；并完成力扣要求的同源登录与 CSRF 校验。</li>
       </ul>
       <p>扩展不申请 <code>tabs</code>、<code>cookies</code>、<code>downloads</code> 或 <code>webRequest</code>。</p>
 
