@@ -6,12 +6,13 @@ export const CLOSE_HISTORY_TAB_REQUEST = 'history.close-tab';
 export interface HistoryStartMessage {
   readonly type: 'start';
   readonly skipSlugs: readonly string[];
-  /** 标签页由扩展临时打开时为 true：面板断开后请求后台关闭该标签页。 */
+  /** 标签页由扩展临时打开时为 true：后台断开后请求关闭该标签页。 */
   readonly temporaryTab: boolean;
 }
 
 export type HistoryPortMessage =
   | { readonly type: 'ready' }
+  | { readonly type: 'heartbeat' }
   | { readonly type: 'progress'; readonly progress: HistoryFetchProgress }
   | { readonly type: 'done'; readonly result: HistoryFetchResult }
   | { readonly type: 'error'; readonly message: string };

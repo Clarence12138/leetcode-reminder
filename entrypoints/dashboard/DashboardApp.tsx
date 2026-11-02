@@ -9,10 +9,12 @@ import { QueueView } from './views/QueueView';
 import { SettingsView } from './views/SettingsView';
 import { navigationItems, setViewHash, type ViewKey, viewFromHash } from './navigation';
 import { useDashboardData, type DashboardData } from './useDashboardData';
+import { HistoryImportContext, useHistoryImport } from './useHistoryImport';
 
 export function DashboardApp(): React.ReactElement {
   const [view, setView] = useState<ViewKey>(() => viewFromHash(window.location.hash));
   const { data, error, refresh } = useDashboardData();
+  const historyImport = useHistoryImport(refresh);
 
   useEffect(() => {
     const handleHash = (): void => setView(viewFromHash(window.location.hash));
@@ -26,13 +28,15 @@ export function DashboardApp(): React.ReactElement {
   };
 
   return (
-    <div className="dashboard-shell">
-      <Sidebar current={view} data={data} onNavigate={navigate} />
-      <main className="dashboard-main">
-        <MobileNavigation current={view} onNavigate={navigate} />
-        <DashboardContent data={data} error={error} refresh={refresh} view={view} />
-      </main>
-    </div>
+    <HistoryImportContext.Provider value={historyImport}>
+      <div className="dashboard-shell">
+        <Sidebar current={view} data={data} importing={historyImport.status === 'running'} onNavigate={navigate} />
+        <main className="dashboard-main">
+          <MobileNavigation current={view} onNavigate={navigate} />
+          <DashboardContent data={data} error={error} refresh={refresh} view={view} />
+        </main>
+      </div>
+    </HistoryImportContext.Provider>
   );
 }
 
@@ -51,7 +55,7 @@ function DashboardContent({ data, error, refresh, view }: { readonly data: Dashb
   return <HomeView onNavigate={setViewHash} resetCodeOnReview={resetCodeOnReview} summary={data.summary} />;
 }
 
-function Sidebar({ current, data, onNavigate }: { readonly current: ViewKey; readonly data: DashboardData | null; readonly onNavigate: (view: ViewKey) => void }): React.ReactElement {
+function Sidebar({ current, data, importing, onNavigate }: { readonly current: ViewKey; readonly data: DashboardData | null; readonly importing: boolean; readonly onNavigate: (view: ViewKey) => void }): React.ReactElement {
   const pending = data ? data.summary.dueProblems.length + data.summary.pendingReviews.length : 0;
   const unreadIssues = data?.summary.issues.filter((issue) => issue.readAt === null).length ?? 0;
   return (
@@ -61,6 +65,7 @@ function Sidebar({ current, data, onNavigate }: { readonly current: ViewKey; rea
         {navigationItems.map((item) => (
           <button className={current === item.key ? 'is-active' : ''} key={item.key} onClick={() => onNavigate(item.key)} type="button">
             <Icon name={item.icon} /><span>{item.label}</span>
+            {item.key === 'settings' && importing && <b>导入中</b>}
             {item.key === 'queue' && pending > 0 && <b>{pending}</b>}
             {item.key === 'issues' && unreadIssues > 0 && <b className="issue-count">{unreadIssues}</b>}
           </button>

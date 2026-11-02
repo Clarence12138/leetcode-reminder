@@ -14,6 +14,8 @@ import type {
 } from './types';
 
 export type ExtensionRequest =
+  | { readonly type: 'history.start'; readonly payload: { readonly rating: HistoryRatingMode } }
+  | { readonly type: 'history.cancel' }
   | {
       readonly type: 'submission.accepted';
       readonly payload: {

@@ -36,7 +36,7 @@ describe('完整面板', () => {
     sendMessage.mockResolvedValue({ ok: true, data: {} });
     Object.defineProperty(globalThis, 'chrome', {
       configurable: true,
-      value: { runtime: { sendMessage } },
+      value: { runtime: { sendMessage }, storage: { session: { get: vi.fn().mockResolvedValue({}) }, onChanged: { addListener: vi.fn(), removeListener: vi.fn() } } },
     });
   });
   afterEach(() => { cleanup(); vi.clearAllMocks(); });

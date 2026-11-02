@@ -213,6 +213,11 @@ const backupImportRequestSchema = z
   })
   .strict();
 
+const historyRatingModeSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('uniform'), rating: masteryRatingSchema }).strict(),
+  z.object({ mode: z.literal('manual') }).strict(),
+]);
+
 const historyImportRequestSchema = z
   .object({
     type: z.literal('history.import'),
@@ -230,10 +235,7 @@ const historyImportRequestSchema = z
             })
             .strict(),
         ),
-        rating: z.discriminatedUnion('mode', [
-          z.object({ mode: z.literal('uniform'), rating: masteryRatingSchema }).strict(),
-          z.object({ mode: z.literal('manual') }).strict(),
-        ]),
+        rating: historyRatingModeSchema,
       })
       .strict(),
   })
@@ -300,6 +302,8 @@ export const extensionRequestSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('backup.export') }).strict(),
   backupImportRequestSchema,
   historyImportRequestSchema,
+  z.object({ type: z.literal('history.start'), payload: z.object({ rating: historyRatingModeSchema }).strict() }).strict(),
+  z.object({ type: z.literal('history.cancel') }).strict(),
   issueRecordRequestSchema,
   ...issueStatusRequestSchemas,
   z.object({ type: z.literal('notification.test') }).strict(),

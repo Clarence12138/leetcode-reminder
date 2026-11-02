@@ -27,7 +27,7 @@ export function SettingsView({ refresh, settings, summary }: SettingsProps): Rea
         settings={settings}
       />
       <ReviewPanel key={String(settings.resetCodeOnReview)} refresh={refresh} settings={settings} />
-      <LeetCodeImportPanel refresh={refresh} summary={summary} />
+      <LeetCodeImportPanel />
       <BackupPanel refresh={refresh} />
       <DataOverview settings={settings} summary={summary} />
       <DangerZone refresh={refresh} />

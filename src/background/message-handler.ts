@@ -4,6 +4,7 @@ import type { Difficulty } from '../domain/types';
 import type { BackupManager } from './backup';
 import { importLeetCodeHistory } from './history-import';
 import { toPublicError } from './errors';
+import type { HistoryImportJob } from './history-import-job';
 import type { DataMirror } from './mirror';
 import type { ReminderCoordinator } from './reminders';
 import type { SettingsRepository } from './settings';
@@ -15,9 +16,12 @@ export interface BackgroundServices {
   readonly backups: BackupManager;
   readonly reminders: ReminderCoordinator;
   readonly mirror?: DataMirror;
+  readonly historyJob?: Pick<HistoryImportJob, 'start' | 'cancel'>;
 }
 
 const READ_ONLY_REQUESTS: ReadonlySet<ExtensionRequest['type']> = new Set([
+  'history.start',
+  'history.cancel',
   'review.preview',
   'dashboard.query',
   'settings.get',
@@ -48,6 +52,9 @@ async function dispatchRequest(
   services: BackgroundServices,
 ): Promise<unknown> {
   switch (request.type) {
+    case 'history.start':
+    case 'history.cancel':
+      return dispatchHistoryJob(request, services);
     case 'submission.accepted': {
       const result = await services.store.recordAccepted(request.payload);
       await services.reminders.refreshBadge();
@@ -84,7 +91,7 @@ async function dispatchRequest(
 
 type MaintenanceRequest = Exclude<
   ExtensionRequest,
-  { readonly type: 'submission.accepted' | 'submission.rate' | 'submission.discard' | 'review.preview' | 'dashboard.query' | 'settings.get' | 'settings.update' }
+  { readonly type: 'history.start' | 'history.cancel' | 'submission.accepted' | 'submission.rate' | 'submission.discard' | 'review.preview' | 'dashboard.query' | 'settings.get' | 'settings.update' }
 >;
 
 async function dispatchMaintenanceRequest(
@@ -127,6 +134,12 @@ async function dispatchMaintenanceRequest(
     default:
       return assertNever(request);
   }
+}
+
+function dispatchHistoryJob(request: Extract<ExtensionRequest, { type: 'history.start' | 'history.cancel' }>, services: BackgroundServices): Promise<void> | void {
+  if (!services.historyJob) throw new Error('导入服务不可用');
+  if (request.type === 'history.start') return services.historyJob.start(request.payload.rating);
+  services.historyJob.cancel();
 }
 
 async function syncMirror(mirror: DataMirror | undefined): Promise<void> {

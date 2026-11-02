@@ -1,5 +1,7 @@
 import { LocalBackupManager } from '../src/background/backup';
 import { XiaoshuajiDatabase } from '../src/background/database';
+import { HistoryImportJob } from '../src/background/history-import-job';
+import { fetchHistoryFromLeetCode } from '../src/background/leetcode-history';
 import { createMessageHandler } from '../src/background/message-handler';
 import { ChromeDataMirror, type MirrorInitializeResult } from '../src/background/mirror';
 import {
@@ -7,7 +9,9 @@ import {
   type NotificationPort,
 } from '../src/background/reminders';
 import { ChromeSettingsRepository, type LocalStoragePort } from '../src/background/settings';
-import { DexieReviewStore } from '../src/background/store';
+import { DexieReviewStore, type ReviewStore } from '../src/background/store';
+import type { ExtensionResponse } from '../src/domain/messages';
+import type { HistoryImportResult } from '../src/domain/types';
 import { isCloseHistoryTabRequest } from '../src/shared/history-port';
 
 export default defineBackground(() => {
@@ -30,9 +34,11 @@ export default defineBackground(() => {
     },
   });
   const backups = new LocalBackupManager(store, settings);
-  const handleMessage = createMessageHandler({ store, settings, backups, reminders, mirror });
+  const services = { store, settings, backups, reminders, mirror };
+  const historyJob = createHistoryJob(store, createMessageHandler(services));
+  const handleMessage = createMessageHandler({ ...services, historyJob });
   // 恢复检查完成前不处理任何读写，避免新数据抢先写入导致跳过恢复。
-  const ready = mirror.initialize().then(reportMirrorResult, reportBackgroundError);
+  const ready = prepareBackground(mirror, historyJob);
   const afterReady = (task: () => Promise<unknown>): void => {
     void ready.then(task).catch(reportBackgroundError);
   };
@@ -62,7 +68,29 @@ export default defineBackground(() => {
   afterReady(() => reminders.initialize());
 });
 
-/** 导入用的临时力扣标签页在面板断开后请求关闭自己。 */
+/** 镜像恢复后再收尾上次中断的导入；失败只记录，ready 不能 reject，否则所有消息都会无响应。 */
+function prepareBackground(mirror: ChromeDataMirror, historyJob: HistoryImportJob): Promise<void> {
+  return mirror.initialize()
+    .then(reportMirrorResult, reportBackgroundError)
+    .then(() => historyJob.recover())
+    .catch(reportBackgroundError);
+}
+
+function createHistoryJob(store: ReviewStore, handleMessage: (request: unknown) => Promise<ExtensionResponse>): HistoryImportJob {
+  return new HistoryImportJob({
+    storage: chrome.storage.session,
+    skipSlugs: async () => (await store.getSnapshot()).problems.map((problem) => problem.slug),
+    fetch: (request) => fetchHistoryFromLeetCode(request, chrome.tabs),
+    closeTab: (id) => chrome.tabs.remove(id),
+    commit: async (problems, rating) => {
+      const response = await handleMessage({ type: 'history.import', payload: { problems, rating } });
+      if (!response.ok) throw new Error(response.error.message);
+      return response.data as HistoryImportResult;
+    },
+  });
+}
+
+/** 导入用的临时力扣标签页在后台连接断开后请求关闭自己。 */
 function closeSenderTab(sender: chrome.runtime.MessageSender): false {
   const tabId = sender.tab?.id;
   if (tabId !== undefined) void chrome.tabs.remove(tabId).catch(() => undefined);
