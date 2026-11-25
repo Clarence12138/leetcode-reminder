@@ -1,9 +1,9 @@
 import type { ExtensionRequest, ExtensionResponse } from '../domain/messages';
 import { parseExtensionRequest } from '../domain/schemas';
-import type { Difficulty } from '../domain/types';
+import type { Difficulty, Settings } from '../domain/types';
 import type { BackupManager } from './backup';
-import { importLeetCodeHistory } from './history-import';
 import { toPublicError } from './errors';
+import { importLeetCodeHistory } from './history-import';
 import type { HistoryImportJob } from './history-import-job';
 import type { DataMirror } from './mirror';
 import type { ReminderCoordinator } from './reminders';
@@ -79,11 +79,8 @@ async function dispatchRequest(
       return services.store.queryDashboard(toDashboardFilter(request.payload));
     case 'settings.get':
       return services.settings.get();
-    case 'settings.update': {
-      const settings = await services.settings.update(request.payload);
-      await services.reminders.settingsChanged(settings);
-      return settings;
-    }
+    case 'settings.update':
+      return handleSettingsUpdate(request.payload, services);
     default:
       return dispatchMaintenanceRequest(request, services);
   }
@@ -91,7 +88,18 @@ async function dispatchRequest(
 
 type MaintenanceRequest = Exclude<
   ExtensionRequest,
-  { readonly type: 'history.start' | 'history.cancel' | 'submission.accepted' | 'submission.rate' | 'submission.discard' | 'review.preview' | 'dashboard.query' | 'settings.get' | 'settings.update' }
+  {
+    readonly type:
+      | 'history.start'
+      | 'history.cancel'
+      | 'submission.accepted'
+      | 'submission.rate'
+      | 'submission.discard'
+      | 'review.preview'
+      | 'dashboard.query'
+      | 'settings.get'
+      | 'settings.update';
+  }
 >;
 
 async function dispatchMaintenanceRequest(
@@ -107,9 +115,13 @@ async function dispatchMaintenanceRequest(
       return backup;
     }
     case 'history.import': {
-      const { timezone } = await services.settings.get();
-      const result = await importLeetCodeHistory(services.store, { ...request.payload, timezone, now: Date.now() });
-      // 导入已提交，徽标刷新失败不应让用户误以为导入失败。
+      const settings = await services.settings.get();
+      const result = await importLeetCodeHistory(services.store, {
+        ...request.payload,
+        timezone: settings.timezone,
+        settings,
+        now: Date.now(),
+      });
       await services.reminders.refreshBadge().catch((error: unknown) => console.error('[小刷记] 刷新徽标失败', error));
       return result;
     }
@@ -126,17 +138,73 @@ async function dispatchMaintenanceRequest(
       await services.settings.reset();
       await services.reminders.initialize();
       return undefined;
-    case 'problem.delete': {
-      const result = await services.store.deleteProblems(request.payload.problemIds);
-      await services.reminders.refreshBadge();
-      return result;
-    }
     default:
-      return assertNever(request);
+      return dispatchProblemMutationRequest(request, services);
   }
 }
 
-function dispatchHistoryJob(request: Extract<ExtensionRequest, { type: 'history.start' | 'history.cancel' }>, services: BackgroundServices): Promise<void> | void {
+type ProblemMutationRequest = Extract<
+  MaintenanceRequest,
+  { readonly type: 'problem.delete' | 'problem.set-paused' | 'problem.set-group' | 'problem.apply-list-group' }
+>;
+
+async function dispatchProblemMutationRequest(
+  request: ProblemMutationRequest,
+  services: BackgroundServices,
+): Promise<unknown> {
+  let result: unknown;
+  switch (request.type) {
+    case 'problem.delete':
+      result = await services.store.deleteProblems(request.payload.problemIds);
+      break;
+    case 'problem.set-paused':
+      result = await services.store.setProblemsPaused(
+        request.payload.problemIds,
+        request.payload.paused,
+      );
+      break;
+    case 'problem.set-group':
+      result = await services.store.setProblemsGroup(
+        request.payload.problemIds,
+        request.payload.groupId,
+      );
+      break;
+    case 'problem.apply-list-group':
+      result = await services.store.applyListGroup(
+        request.payload.listIds,
+        request.payload.groupId,
+      );
+      break;
+    default:
+      return assertNever(request);
+  }
+  await services.reminders.refreshBadge();
+  return result;
+}
+
+async function handleSettingsUpdate(
+  patch: Partial<Settings>,
+  services: BackgroundServices,
+): Promise<Settings> {
+  const previous = await services.settings.get();
+  const updated = await services.settings.update(patch);
+  if (hasRetentionConfigChanged(previous, updated)) {
+    await services.store.recalculateSchedules(updated);
+    await syncMirror(services.mirror);
+  }
+  await services.reminders.settingsChanged(updated);
+  return updated;
+}
+
+function hasRetentionConfigChanged(previous: Settings, next: Settings): boolean {
+  if (previous.defaultRequestRetention !== next.defaultRequestRetention) return true;
+  return JSON.stringify(previous.reviewGroups) !== JSON.stringify(next.reviewGroups);
+}
+
+function dispatchHistoryJob(
+  request: Extract<ExtensionRequest, { type: 'history.start' | 'history.cancel' }>,
+  services: BackgroundServices,
+): Promise<void> | void {
   if (!services.historyJob) throw new Error('导入服务不可用');
   if (request.type === 'history.start') return services.historyJob.start(request.payload.rating);
   services.historyJob.cancel();

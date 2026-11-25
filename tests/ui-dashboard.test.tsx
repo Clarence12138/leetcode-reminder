@@ -28,6 +28,11 @@ const settings: Settings = {
   timezone: 'Asia/Shanghai',
   schemaVersion: 1,
   resetCodeOnReview: false,
+  dailyReviewLimit: null,
+  queueSortStrategy: 'due_asc',
+  defaultRequestRetention: 0.9,
+  reviewGroups: [],
+  autoGroupRules: [],
 };
 
 describe('完整面板', () => {
@@ -262,6 +267,67 @@ describe('完整面板', () => {
     const navigation = await screen.findByRole('navigation', { name: '主导航' });
     const issuesButton = within(navigation).getByRole('button', { name: /检测异常/ });
     expect(issuesButton.querySelector('.issue-count')).toHaveTextContent('1');
+  });
+
+  it('全部题目页支持批量暂停、恢复和按复习状态筛选', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    sendMessage.mockResolvedValue({ ok: true, data: { updatedCount: 1 } });
+    const mixed: readonly ProblemRecord[] = [
+      { ...problems[0]!, pausedAt: null },
+      { ...problems[1]!, pausedAt: 1_700_000_000_500 },
+    ];
+    render(<ProblemsView refresh={refresh} settings={settings} summary={{ ...summary, problems: mixed }} />);
+
+    fireEvent.change(screen.getByLabelText('按复习状态筛选'), { target: { value: 'PAUSED' } });
+    expect(screen.getByText('接雨水')).toBeInTheDocument();
+    expect(screen.queryByText('两数之和')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('选择接雨水'));
+    fireEvent.click(screen.getByRole('button', { name: '批量恢复复习' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
+      type: 'problem.set-paused',
+      payload: { problemIds: ['leetcode-cn:42'], paused: false },
+    }));
+    await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+  });
+
+  it('队列页支持切换排序策略和展开配额积压', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    const cappedSettings: Settings = { ...settings, dailyReviewLimit: 1 };
+    render(<QueueView refresh={refresh} settings={cappedSettings} summary={summary} />);
+
+    expect(screen.getByText(/今日配额复习 · 1/)).toBeInTheDocument();
+    expect(screen.getByText(/其余逾期积压 · 1/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '展开其余 1 题' }));
+    expect(screen.getByText('接雨水')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('队列排序策略'), { target: { value: 'priority' } });
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
+      type: 'settings.update',
+      payload: { queueSortStrategy: 'priority' },
+    }));
+  });
+
+  it('设置页支持调节每日配额、创建分组和一键归组高频题单', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    sendMessage.mockResolvedValue({ ok: true, data: { matchedCount: 1, updatedCount: 1 } });
+    const groupedSettings: Settings = {
+      ...settings,
+      reviewGroups: [{ id: 'hot', name: '高频核心', requestRetention: 0.9 }],
+    };
+    render(<SettingsView refresh={refresh} settings={groupedSettings} summary={summary} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '3 题' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
+      type: 'settings.update',
+      payload: { dailyReviewLimit: 3 },
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: '一键归组所选题单命中题目' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
+      type: 'problem.apply-list-group',
+      payload: { listIds: ['hot-100'], groupId: 'hot' },
+    }));
   });
 });
 

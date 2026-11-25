@@ -1,5 +1,6 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import type { ProblemRecord, SubmissionReview, SubmissionTrigger } from '../../../src/domain/types';
+import { resolveProblemGroup } from '../../../src/domain/queue-policy';
+import type { ProblemRecord, Settings, SubmissionReview, SubmissionTrigger } from '../../../src/domain/types';
 import { withReviewResetIntent } from '../../../src/leetcode/url';
 import { DifficultyBadge } from '../../../src/ui/components';
 import { formatDateTime, formatDue, problemName } from '../../../src/ui/format';
@@ -24,20 +25,28 @@ export function ProblemRow({
   compact = false,
   problem,
   reviewJump = false,
+  settings,
 }: {
   readonly compact?: boolean;
   readonly problem: ProblemRecord;
   readonly reviewJump?: boolean;
+  readonly settings?: Pick<Settings, 'reviewGroups'> | undefined;
 }): React.ReactElement {
   const dueLabel = formatDue(problem.nextReviewAt);
   const isOverdue = dueLabel.startsWith('逾期') || dueLabel === '昨天到期';
   const href = reviewJump ? withReviewResetIntent(problem.url) : problem.url;
+  const group = settings ? resolveProblemGroup(problem, settings) : null;
   return (
     <article className="problem-row">
       <span className="problem-row__number">{problem.frontendId}</span>
       <div className="problem-row__main">
         <a href={href} rel="noreferrer" target="_blank">{problem.title} <Icon name="external" size={13} /></a>
-        {!compact && <span className="tag-line">{problem.tags.slice(0, 3).map((tag) => <i key={tag}>{tag}</i>)}</span>}
+        {!compact && (
+          <span className="tag-line">
+            {group && <i className="group-chip">{group.name} · {Math.round(group.requestRetention * 100)}%</i>}
+            {problem.tags.slice(0, 3).map((tag) => <i key={tag}>{tag}</i>)}
+          </span>
+        )}
       </div>
       <DifficultyBadge difficulty={problem.difficulty} />
       <time className={isOverdue ? 'is-overdue' : ''}>{dueLabel}</time>

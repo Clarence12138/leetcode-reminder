@@ -1,6 +1,20 @@
+import type { BuiltinProblemListId } from './problem-lists';
+
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 export type MasteryRating = 'AGAIN' | 'HARD' | 'GOOD' | 'EASY';
 export type SubmissionTrigger = 'button' | 'keyboard' | 'import';
+export type QueueSortStrategy = 'due_asc' | 'priority' | 'stability_asc';
+
+export interface ReviewGroup {
+  readonly id: string;
+  readonly name: string;
+  readonly requestRetention: number;
+}
+
+export interface AutoGroupRule {
+  readonly listId: BuiltinProblemListId;
+  readonly groupId: string;
+}
 
 export interface ProblemMetadata {
   readonly problemId: string;
@@ -42,6 +56,8 @@ export interface ProblemRecord extends ProblemMetadata {
   readonly updatedAt: number;
   readonly fsrsCard: SerializedFsrsCard | null;
   readonly nextReviewAt: number | null;
+  readonly pausedAt?: number | null;
+  readonly groupId?: string | null;
   readonly algorithm: 'FSRS-6';
   readonly algorithmLibrary: string;
   readonly parametersVersion: string;
@@ -83,6 +99,11 @@ export interface Settings {
   readonly timezone: string;
   readonly schemaVersion: number;
   readonly resetCodeOnReview: boolean;
+  readonly dailyReviewLimit: number | null;
+  readonly queueSortStrategy: QueueSortStrategy;
+  readonly defaultRequestRetention: number;
+  readonly reviewGroups: readonly ReviewGroup[];
+  readonly autoGroupRules: readonly AutoGroupRule[];
 }
 
 export interface DailySummary {
@@ -91,6 +112,13 @@ export interface DailySummary {
   readonly pendingReviews: readonly SubmissionReview[];
   readonly recentReviews: readonly SubmissionReview[];
   readonly issues: readonly DetectionIssue[];
+  readonly dailyQuota?: {
+    readonly limit: number | null;
+    readonly completedToday: number;
+    readonly remainingDue: number;
+    readonly overflowDue: number;
+    readonly reached: boolean;
+  };
 }
 
 export interface LeetCodeHistoryProblem {

@@ -1,4 +1,5 @@
 import { ALARM_NAME, APP_NAME } from '../domain/constants';
+import { computeDailyQuota } from '../domain/queue-policy';
 import type { Settings } from '../domain/types';
 import { AppError } from './errors';
 import type { SettingsRepository } from './settings';
@@ -89,6 +90,7 @@ export class ReminderCoordinator {
 
   async settingsChanged(settings: Settings): Promise<void> {
     await this.ensureAlarm(settings, true);
+    await this.refreshBadge();
   }
 
   async handleAlarm(name: string): Promise<void> {
@@ -111,15 +113,19 @@ export class ReminderCoordinator {
   }
 
   async refreshBadge(): Promise<void> {
-    const counts = await this.store.getAttentionCounts();
-    const total = counts.due + counts.pending;
+    const [counts, settings] = await Promise.all([
+      this.store.getAttentionCounts(),
+      this.settings.get(),
+    ]);
+    const effectiveDue = await this.resolveEffectiveDue(counts.due, settings);
+    const total = effectiveDue + counts.pending;
     await this.badge.setBadgeText({ text: total === 0 ? '' : String(total) });
     if (total > 0) {
       await this.badge.setBadgeBackgroundColor({
-        color: counts.due > 0 ? DUE_BADGE_COLOR : PENDING_BADGE_COLOR,
+        color: effectiveDue > 0 ? DUE_BADGE_COLOR : PENDING_BADGE_COLOR,
       });
     }
-    await this.badge.setTitle({ title: badgeTitle(counts) });
+    await this.badge.setTitle({ title: badgeTitle({ due: effectiveDue, pending: counts.pending }) });
   }
 
   async testNotification(): Promise<TestNotificationResult> {
@@ -138,15 +144,26 @@ export class ReminderCoordinator {
     const date = localDateKey(new Date(this.now()));
     if ((await this.settings.getLastNotificationDate()) === date) return;
     const counts = await this.store.getAttentionCounts(endOfLocalDay(this.now()));
-    if (counts.due + counts.pending === 0) return;
+    const effectiveDue = await this.resolveEffectiveDue(counts.due, settings);
+    if (effectiveDue + counts.pending === 0) return;
 
     await this.notifications.create(`${SUMMARY_NOTIFICATION_PREFIX}${date}`, {
       type: 'basic',
       iconUrl: this.runtime.getUrl('/icons/icon-128.png'),
       title: APP_NAME,
-      message: `今日/逾期 ${counts.due} 题、待评估 ${counts.pending} 条`,
+      message: formatSummaryMessage({ due: counts.due, effectiveDue, pending: counts.pending }),
     });
     await this.settings.setLastNotificationDate(date);
+  }
+
+  private async resolveEffectiveDue(dueCount: number, settings: Settings): Promise<number> {
+    if (settings.dailyReviewLimit === null) return dueCount;
+    const completedToday = await this.store.countReviewedToday(settings.timezone, this.now());
+    return computeDailyQuota({
+      dueCount,
+      completedToday,
+      dailyReviewLimit: settings.dailyReviewLimit,
+    }).remainingDue;
   }
 
   private async ensureAlarm(settings: Settings, force = false): Promise<void> {
@@ -211,6 +228,17 @@ function hasPassedReminder(now: number, settings: Settings): boolean {
 function badgeTitle(counts: AttentionCounts): string {
   if (counts.due + counts.pending === 0) return APP_NAME;
   return `${APP_NAME}：${counts.due} 题待复习，${counts.pending} 条待评估`;
+}
+
+function formatSummaryMessage(options: {
+  readonly due: number;
+  readonly effectiveDue: number;
+  readonly pending: number;
+}): string {
+  if (options.effectiveDue < options.due) {
+    return `今日配额 ${options.effectiveDue} 题（共 ${options.due} 题到期）、待评估 ${options.pending} 条`;
+  }
+  return `今日/逾期 ${options.effectiveDue} 题、待评估 ${options.pending} 条`;
 }
 
 function errorMessage(error: unknown): string {

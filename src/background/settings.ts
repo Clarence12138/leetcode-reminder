@@ -2,9 +2,10 @@ import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_REMINDER_HOUR,
   DEFAULT_REMINDER_MINUTE,
+  FSRS_REQUEST_RETENTION,
 } from '../domain/constants';
 import { settingsSchema, settingsV0Schema } from '../domain/schemas';
-import type { Settings } from '../domain/types';
+import type { AutoGroupRule, ReviewGroup, Settings } from '../domain/types';
 import { AppError } from './errors';
 
 export const SETTINGS_STORAGE_KEY = 'settings';
@@ -41,7 +42,7 @@ export class ChromeSettingsRepository implements SettingsRepository {
       return defaults;
     }
     const parsed = settingsSchema.safeParse(value);
-    if (parsed.success) return parsed.data;
+    if (parsed.success) return sanitizeGroupReferences(parsed.data);
     const migrated = migrateSettingsV0(value);
     if (migrated) {
       await this.storage.set({ [SETTINGS_STORAGE_KEY]: migrated });
@@ -53,13 +54,17 @@ export class ChromeSettingsRepository implements SettingsRepository {
   async update(patch: Partial<Settings>): Promise<Settings> {
     assertManagedFields(patch, this.getTimezone());
     const current = await this.get();
-    const settings = settingsSchema.parse({ ...current, ...patch });
+    const merged = mergeSettingsPatch(current, patch);
+    const settings = settingsSchema.parse(merged);
+    assertValidGroupConfig(settings);
     await this.storage.set({ [SETTINGS_STORAGE_KEY]: settings });
     return settings;
   }
 
   async replace(settings: Settings): Promise<Settings> {
-    const normalized = settingsSchema.parse({ ...settings, timezone: this.getTimezone() });
+    const parsed = settingsSchema.parse({ ...settings, timezone: this.getTimezone() });
+    const normalized = sanitizeGroupReferences(parsed);
+    assertUniqueGroupIds(normalized.reviewGroups);
     await this.storage.set({ [SETTINGS_STORAGE_KEY]: normalized });
     return normalized;
   }
@@ -112,6 +117,11 @@ export function createDefaultSettings(timezone = systemTimezone()): Settings {
     timezone,
     schemaVersion: CURRENT_SCHEMA_VERSION,
     resetCodeOnReview: false,
+    dailyReviewLimit: null,
+    queueSortStrategy: 'due_asc',
+    defaultRequestRetention: FSRS_REQUEST_RETENTION,
+    reviewGroups: [],
+    autoGroupRules: [],
   };
 }
 
@@ -127,5 +137,50 @@ function assertManagedFields(patch: Partial<Settings>, timezone: string): void {
   }
   if (patch.timezone !== undefined && patch.timezone !== timezone) {
     throw new AppError('TIMEZONE_MANAGED', '时区由系统自动管理');
+  }
+}
+
+function mergeSettingsPatch(current: Settings, patch: Partial<Settings>): Settings {
+  const merged: Settings = { ...current, ...patch };
+  if (patch.reviewGroups !== undefined && patch.autoGroupRules === undefined) {
+    return sanitizeGroupReferences(merged);
+  }
+  return merged;
+}
+
+function sanitizeGroupReferences(settings: Settings): Settings {
+  const validGroupIds = new Set(settings.reviewGroups.map((group) => group.id));
+  const seenLists = new Set<string>();
+  const autoGroupRules: AutoGroupRule[] = [];
+  for (const rule of settings.autoGroupRules) {
+    if (!validGroupIds.has(rule.groupId) || seenLists.has(rule.listId)) continue;
+    seenLists.add(rule.listId);
+    autoGroupRules.push(rule);
+  }
+  return { ...settings, autoGroupRules };
+}
+
+function assertValidGroupConfig(settings: Settings): void {
+  assertUniqueGroupIds(settings.reviewGroups);
+  const validGroupIds = new Set(settings.reviewGroups.map((group) => group.id));
+  const seenLists = new Set<string>();
+  for (const rule of settings.autoGroupRules) {
+    if (!validGroupIds.has(rule.groupId)) {
+      throw new AppError('GROUP_NOT_FOUND', `自动归组规则引用了不存在的分组 ${rule.groupId}`);
+    }
+    if (seenLists.has(rule.listId)) {
+      throw new AppError('DUPLICATE_AUTO_GROUP_RULE', `题单 ${rule.listId} 不能配置多条自动归组规则`);
+    }
+    seenLists.add(rule.listId);
+  }
+}
+
+function assertUniqueGroupIds(groups: readonly ReviewGroup[]): void {
+  const ids = new Set<string>();
+  for (const group of groups) {
+    if (ids.has(group.id)) {
+      throw new AppError('DUPLICATE_GROUP_ID', `分组 ID 重复：${group.id}`);
+    }
+    ids.add(group.id);
   }
 }

@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
-import type { DailySummary, Settings } from '../../../src/domain/types';
+import type { DailySummary, QueueSortStrategy, Settings } from '../../../src/domain/types';
 import { sendExtensionRequest } from '../../../src/shared/messaging';
 import { Button, InlineNotice, PageHeading } from '../../../src/ui/components';
 import { parseTimeValue, toTimeValue } from '../../../src/ui/format';
 import { downloadJson } from '../../../src/ui/runtime';
 import { ConfirmDialog } from './ConfirmDialog';
 import { LeetCodeImportPanel } from './LeetCodeImportPanel';
+import { ReviewGroupsPanel } from './ReviewGroupsPanel';
 import { Panel } from './ViewParts';
 
 interface SettingsProps {
@@ -14,11 +15,13 @@ interface SettingsProps {
   readonly summary: DailySummary;
 }
 
+const DAILY_LIMIT_PRESETS: readonly (number | null)[] = [null, 3, 5, 8];
+
 export function SettingsView({ refresh, settings, summary }: SettingsProps): React.ReactElement {
   const [reminderNotice, setReminderNotice] = useState<Notice | null>(null);
   return (
     <div className="view-content settings-view">
-      <PageHeading description="调整每日提醒、复习时的代码还原，或管理仅保存在本机的复习数据。" title="设置" />
+      <PageHeading description="调整每日提醒、复习配额、分组目标保持率，或管理仅保存在本机的复习数据。" title="设置" />
       <ReminderPanel
         key={`${settings.notificationsEnabled}-${settings.reminderHour}-${settings.reminderMinute}-${settings.timezone}`}
         notice={reminderNotice}
@@ -26,7 +29,12 @@ export function SettingsView({ refresh, settings, summary }: SettingsProps): Rea
         refresh={refresh}
         settings={settings}
       />
-      <ReviewPanel key={String(settings.resetCodeOnReview)} refresh={refresh} settings={settings} />
+      <ReviewPanel
+        key={`${settings.resetCodeOnReview}-${settings.dailyReviewLimit ?? 'none'}-${settings.queueSortStrategy}`}
+        refresh={refresh}
+        settings={settings}
+      />
+      <ReviewGroupsPanel refresh={refresh} settings={settings} summary={summary} />
       <LeetCodeImportPanel />
       <BackupPanel refresh={refresh} />
       <DataOverview settings={settings} summary={summary} />
@@ -81,39 +89,37 @@ function ReminderPanel({ notice, onNotice, refresh, settings }: { readonly notic
   );
 }
 
-function ReviewPanel({
-  refresh,
-  settings,
-}: {
-  readonly refresh: () => Promise<void>;
-  readonly settings: Settings;
-}): React.ReactElement {
-  const [enabled, setEnabled] = useState(settings.resetCodeOnReview);
-  const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(null);
+function ReviewPanel({ refresh, settings }: { readonly refresh: () => Promise<void>; readonly settings: Settings }): React.ReactElement {
+  const [resetEnabled, setResetEnabled] = useState(settings.resetCodeOnReview);
+  const [limitText, setLimitText] = useState(settings.dailyReviewLimit === null ? '' : String(settings.dailyReviewLimit));
+  const { notice, saving, setNotice, updatePatch } = useSettingsPatch(refresh);
+
+  const toggleReset = async (next: boolean): Promise<void> => {
+    setResetEnabled(next);
+    if (!(await updatePatch({ resetCodeOnReview: next }))) setResetEnabled(!next);
+  };
+  const applyDailyLimit = async (limit: number | null): Promise<void> => {
+    setLimitText(limit === null ? '' : String(limit));
+    await updatePatch({ dailyReviewLimit: limit }, limit === null ? '已取消每日复习配额限制。' : `今日复习配额已设为每天 ${limit} 题。`);
+  };
+  const applyCustomLimit = async (): Promise<void> => {
+    const parsed = parseDailyLimitInput(limitText);
+    if (parsed === 'invalid') { setNotice({ tone: 'error', text: '每日配额需为 1–200 之间的整数，或留空表示不限。' }); return; }
+    await applyDailyLimit(parsed);
+  };
   return (
     <Panel title="复习">
       <div className="settings-form">
-        <SettingRow
-          description="仅从首页或待处理队列打开今日/逾期题目时生效。打开后会先遮住编辑器再还原，避免看到上次写的代码。历史提交仍保留在力扣中。"
-          label="打开复习题时还原代码模板"
-        >
-          <label className="switch">
-            <input
-              aria-label="打开复习题时还原代码模板"
-              checked={enabled}
-              disabled={saving}
-              onChange={(event) => void persistReviewResetSetting({
-                next: event.target.checked,
-                refresh,
-                setEnabled,
-                setNotice,
-                setSaving,
-              })}
-              type="checkbox"
-            />
-            <span />
-          </label>
+        <SettingRow description="仅从首页或待处理队列打开今日/逾期题目时生效。打开后会先遮住编辑器再还原，避免看到上次写的代码。历史提交仍保留在力扣中。" label="打开复习题时还原代码模板">
+          <label className="switch"><input aria-label="打开复习题时还原代码模板" checked={resetEnabled} disabled={saving} onChange={(event) => void toggleReset(event.target.checked)} type="checkbox" /><span /></label>
+        </SettingRow>
+        <DailyLimitRow currentLimit={settings.dailyReviewLimit} limitText={limitText} onApplyCustom={() => void applyCustomLimit()} onLimitTextChange={setLimitText} onSelectPreset={(limit) => void applyDailyLimit(limit)} saving={saving} />
+        <SettingRow description="默认按最早到期时间排序；积压较多时可切换为智能优先，先复习高频分组、薄弱题和近期新题。" label="队列排序策略">
+          <select aria-label="默认队列排序策略" className="setting-select" disabled={saving} onChange={(event) => void updatePatch({ queueSortStrategy: event.target.value as QueueSortStrategy }, '队列排序策略已保存。')} value={settings.queueSortStrategy}>
+            <option value="due_asc">最早到期优先（默认）</option>
+            <option value="priority">智能优先（高保持率 / 薄弱 / 难题）</option>
+            <option value="stability_asc">薄弱与新题优先</option>
+          </select>
         </SettingRow>
         {notice && <InlineNotice tone={notice.tone}>{notice.text}</InlineNotice>}
       </div>
@@ -121,26 +127,59 @@ function ReviewPanel({
   );
 }
 
-async function persistReviewResetSetting(options: {
-  readonly next: boolean;
-  readonly refresh: () => Promise<void>;
-  readonly setEnabled: (value: boolean) => void;
-  readonly setNotice: (notice: Notice | null) => void;
-  readonly setSaving: (value: boolean) => void;
-}): Promise<void> {
-  const { next, refresh, setEnabled, setNotice, setSaving } = options;
-  setSaving(true);
-  setNotice(null);
-  setEnabled(next);
-  try {
-    await sendExtensionRequest({ type: 'settings.update', payload: { resetCodeOnReview: next } });
-    await refresh();
-  } catch (cause) {
-    setEnabled(!next);
-    setNotice(toErrorNotice(cause, '复习设置保存失败'));
-  } finally {
-    setSaving(false);
-  }
+function DailyLimitRow({ currentLimit, limitText, onApplyCustom, onLimitTextChange, onSelectPreset, saving }: {
+  readonly currentLimit: number | null;
+  readonly limitText: string;
+  readonly onApplyCustom: () => void;
+  readonly onLimitTextChange: (value: string) => void;
+  readonly onSelectPreset: (limit: number | null) => void;
+  readonly saving: boolean;
+}): React.ReactElement {
+  return (
+    <SettingRow description="设置后，队列只优先展示今日配额题数，完成即清零扩展角标；其余积压题会折叠保留，想多刷可随时展开。" label="今日复习配额">
+      <div className="quota-controls">
+        <div className="preset-group">
+          {DAILY_LIMIT_PRESETS.map((preset) => (
+            <button className={`preset-pill${currentLimit === preset ? ' is-active' : ''}`} disabled={saving} key={preset ?? 'unlimited'} onClick={() => onSelectPreset(preset)} type="button">
+              {preset === null ? '不限' : `${preset} 题`}
+            </button>
+          ))}
+        </div>
+        <div className="quota-custom">
+          <input aria-label="自定义每日复习配额" disabled={saving} max={200} min={1} onChange={(event) => onLimitTextChange(event.target.value)} placeholder="自定义" type="number" value={limitText} />
+          <Button disabled={saving} onClick={onApplyCustom}>应用</Button>
+        </div>
+      </div>
+    </SettingRow>
+  );
+}
+
+function useSettingsPatch(refresh: () => Promise<void>) {
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const updatePatch = async (patch: Partial<Settings>, successText?: string): Promise<boolean> => {
+    setSaving(true);
+    setNotice(null);
+    try {
+      await sendExtensionRequest({ type: 'settings.update', payload: patch });
+      await refresh();
+      if (successText) setNotice({ tone: 'success', text: successText });
+      return true;
+    } catch (cause) {
+      setNotice(toErrorNotice(cause, '复习设置保存失败'));
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+  return { notice, saving, setNotice, updatePatch };
+}
+
+function parseDailyLimitInput(value: string): number | null | 'invalid' {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 200 ? parsed : 'invalid';
 }
 
 function BackupPanel({ refresh }: { readonly refresh: () => Promise<void> }): React.ReactElement {
@@ -155,62 +194,13 @@ function BackupPanel({ refresh }: { readonly refresh: () => Promise<void> }): Re
   const confirmReplacement = (): Promise<void> => performReplacement({ refresh, replacement, setBusy, setNotice, setReplacement });
 
   return (
-    <BackupPanelContent
-      busy={busy}
-      inputRef={inputRef}
-      mode={mode}
-      notice={notice}
-      onChoose={chooseBackup}
-      onConfirm={confirmReplacement}
-      onExport={exportBackup}
-      onModeChange={setMode}
-      onReplacementChange={setReplacement}
-      replacement={replacement}
-    />
-  );
-}
-
-interface BackupPanelContentProps {
-  readonly busy: boolean;
-  readonly inputRef: React.RefObject<HTMLInputElement | null>;
-  readonly mode: 'merge' | 'replace';
-  readonly notice: Notice | null;
-  readonly onChoose: (file: File) => Promise<void>;
-  readonly onConfirm: () => Promise<void>;
-  readonly onExport: () => Promise<void>;
-  readonly onModeChange: (mode: 'merge' | 'replace') => void;
-  readonly onReplacementChange: (backup: PendingBackup | null) => void;
-  readonly replacement: PendingBackup | null;
-}
-
-interface BackupStateSetters {
-  readonly setBusy: (busy: boolean) => void;
-  readonly setNotice: (notice: Notice | null) => void;
-}
-
-interface ImportOptions {
-  readonly file: File;
-  readonly mode: 'merge' | 'replace';
-  readonly refresh: () => Promise<void>;
-  readonly setNotice: (notice: Notice | null) => void;
-  readonly setReplacement: (backup: PendingBackup | null) => void;
-}
-
-interface ReplacementOptions extends BackupStateSetters {
-  readonly refresh: () => Promise<void>;
-  readonly replacement: PendingBackup | null;
-  readonly setReplacement: (backup: PendingBackup | null) => void;
-}
-
-function BackupPanelContent({ busy, inputRef, mode, notice, onChoose, onConfirm, onExport, onModeChange, onReplacementChange, replacement }: BackupPanelContentProps): React.ReactElement {
-  return (
     <Panel title="备份与恢复">
       <div className="backup-layout">
-        <div><h3>导出 JSON 备份</h3><p>包含题目、提交评分、检测异常和设置，不包含提交代码或账号凭据。</p><Button disabled={busy} icon="download" onClick={() => void onExport()}>导出备份</Button></div>
-        <div><h3>导入 JSON 备份</h3><p>导入前会完整校验；发现提交 ID 冲突时会终止，不会部分写入。</p><div className="import-actions"><select aria-label="备份导入方式" onChange={(event) => onModeChange(event.target.value as 'merge' | 'replace')} value={mode}><option value="merge">合并导入</option><option value="replace">覆盖恢复</option></select><Button icon="upload" onClick={() => inputRef.current?.click()}>选择备份</Button><input accept="application/json,.json" className="visually-hidden" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void onChoose(file); }} ref={inputRef} type="file" /></div></div>
+        <div><h3>导出 JSON 备份</h3><p>包含题目、提交评分、检测异常和设置，不包含提交代码或账号凭据。</p><Button disabled={busy} icon="download" onClick={() => void exportBackup()}>导出备份</Button></div>
+        <div><h3>导入 JSON 备份</h3><p>导入前会完整校验；发现提交 ID 冲突时会终止，不会部分写入。</p><div className="import-actions"><select aria-label="备份导入方式" onChange={(event) => setMode(event.target.value as 'merge' | 'replace')} value={mode}><option value="merge">合并导入</option><option value="replace">覆盖恢复</option></select><Button icon="upload" onClick={() => inputRef.current?.click()}>选择备份</Button><input accept="application/json,.json" className="visually-hidden" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void chooseBackup(file); }} ref={inputRef} type="file" /></div></div>
       </div>
       {notice && <InlineNotice tone={notice.tone}>{notice.text}</InlineNotice>}
-      {replacement && <ConfirmDialog busy={busy} confirmText="覆盖" description={`覆盖恢复会先删除当前本地数据，再导入 ${replacement.filename}。`} onCancel={() => onReplacementChange(null)} onConfirm={() => void onConfirm()} title="确认覆盖恢复" />}
+      {replacement && <ConfirmDialog busy={busy} confirmText="覆盖" description={`覆盖恢复会先删除当前本地数据，再导入 ${replacement.filename}。`} onCancel={() => setReplacement(null)} onConfirm={() => void confirmReplacement()} title="确认覆盖恢复" />}
     </Panel>
   );
 }
@@ -291,6 +281,9 @@ function SettingRow({ children, description, label }: React.PropsWithChildren<{ 
 
 interface Notice { readonly text: string; readonly tone: 'error' | 'success' }
 interface PendingBackup { readonly backup: unknown; readonly filename: string }
+interface BackupStateSetters { readonly setBusy: (busy: boolean) => void; readonly setNotice: (notice: Notice | null) => void }
+interface ImportOptions { readonly file: File; readonly mode: 'merge' | 'replace'; readonly refresh: () => Promise<void>; readonly setNotice: (notice: Notice | null) => void; readonly setReplacement: (backup: PendingBackup | null) => void }
+interface ReplacementOptions extends BackupStateSetters { readonly refresh: () => Promise<void>; readonly replacement: PendingBackup | null; readonly setReplacement: (backup: PendingBackup | null) => void }
 
 function toErrorNotice(cause: unknown, fallback: string): Notice {
   return { tone: 'error', text: cause instanceof Error ? cause.message : fallback };

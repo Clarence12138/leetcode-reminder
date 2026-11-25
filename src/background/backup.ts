@@ -1,6 +1,6 @@
 import { BACKUP_FORMAT, BACKUP_SCHEMA_VERSION } from '../domain/constants';
 import { backupV2Schema, parseBackup } from '../domain/schemas';
-import type { BackupV2 } from '../domain/types';
+import type { BackupV2, Settings } from '../domain/types';
 import { AppError } from './errors';
 import type { SettingsRepository } from './settings';
 import type { PersistedSnapshot } from './store-import';
@@ -35,20 +35,27 @@ export class LocalBackupManager implements BackupManager {
 
   async import(input: unknown, mode: 'merge' | 'replace'): Promise<BackupV2> {
     const backup = parseBackup(input);
-    const original = await this.store.getSnapshot();
-    await this.store.importSnapshot(toSnapshot(backup), mode);
+    const [original, originalSettings] = await Promise.all([
+      this.store.getSnapshot(),
+      this.settings.get(),
+    ]);
+    await this.store.importSnapshot(toSnapshot(backup), mode, backup.settings);
 
     try {
       await this.settings.replace(backup.settings);
     } catch (error) {
-      await this.rollbackData(original, error);
+      await this.rollbackData(original, originalSettings, error);
     }
     return this.export();
   }
 
-  private async rollbackData(original: PersistedSnapshot, settingsError: unknown): Promise<never> {
+  private async rollbackData(
+    original: PersistedSnapshot,
+    originalSettings: Settings,
+    settingsError: unknown,
+  ): Promise<never> {
     try {
-      await this.store.importSnapshot(original, 'replace');
+      await this.store.importSnapshot(original, 'replace', originalSettings);
     } catch (rollbackError) {
       throw new AppError(
         'BACKUP_ROLLBACK_FAILED',

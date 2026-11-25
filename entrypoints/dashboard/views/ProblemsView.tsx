@@ -1,84 +1,110 @@
 import { useMemo, useState } from 'react';
-import type { DailySummary, Difficulty, ProblemRecord } from '../../../src/domain/types';
+import { BUILTIN_PROBLEM_LISTS } from '../../../src/domain/problem-lists';
+import { isProblemPaused, resolveProblemGroup } from '../../../src/domain/queue-policy';
+import type { DailySummary, ProblemRecord, ReviewGroup, Settings } from '../../../src/domain/types';
 import { sendExtensionRequest } from '../../../src/shared/messaging';
 import { Button, DifficultyBadge, EmptyState, InlineNotice, PageHeading } from '../../../src/ui/components';
 import { formatDate, formatDue } from '../../../src/ui/format';
 import { Icon } from '../../../src/ui/Icon';
+import { ProblemBatchToolbar } from './ProblemBatchToolbar';
+import {
+  filterAndSortProblems,
+  getProblemTags,
+  type DifficultyFilter,
+  type ListFilter,
+  type ProblemFilters,
+  type ProblemSort,
+  type StatusFilter,
+} from './problem-filters';
 
-type DifficultyFilter = Difficulty | 'ALL';
-type ProblemDateField = 'CREATED_AT' | 'LAST_REVIEW_AT';
-type SortDirection = 'ASC' | 'DESC';
-type ProblemSort = 'CREATED_AT_ASC' | 'CREATED_AT_DESC' | 'LAST_REVIEW_AT_ASC' | 'LAST_REVIEW_AT_DESC';
-type ProblemFilters = Readonly<{ difficulty: DifficultyFilter; search: string; tag: string }>;
-
-const SORT_OPTIONS: Readonly<Record<ProblemSort, Readonly<{ dateField: ProblemDateField; direction: SortDirection }>>> = {
-  CREATED_AT_ASC: { dateField: 'CREATED_AT', direction: 'ASC' },
-  CREATED_AT_DESC: { dateField: 'CREATED_AT', direction: 'DESC' },
-  LAST_REVIEW_AT_ASC: { dateField: 'LAST_REVIEW_AT', direction: 'ASC' },
-  LAST_REVIEW_AT_DESC: { dateField: 'LAST_REVIEW_AT', direction: 'DESC' },
+const INITIAL_FILTERS: ProblemFilters = {
+  difficulty: 'ALL',
+  group: 'ALL',
+  list: 'ALL',
+  search: '',
+  status: 'ALL',
+  tag: 'ALL',
 };
 
-export function ProblemsView({ summary, refresh }: { readonly refresh: () => Promise<void>; readonly summary: DailySummary }): React.ReactElement {
-  const [search, setSearch] = useState('');
-  const [difficulty, setDifficulty] = useState<DifficultyFilter>('ALL');
-  const [tag, setTag] = useState('ALL');
+export function ProblemsView({
+  refresh,
+  settings,
+  summary,
+}: {
+  readonly refresh: () => Promise<void>;
+  readonly settings?: Settings;
+  readonly summary: DailySummary;
+}): React.ReactElement {
+  const [filters, setFilters] = useState<ProblemFilters>(INITIAL_FILTERS);
   const [sort, setSort] = useState<ProblemSort>('CREATED_AT_DESC');
-  const tags = useMemo(() => getTags(summary.problems), [summary.problems]);
+  const groups = useMemo(() => settings?.reviewGroups ?? [], [settings?.reviewGroups]);
+  const tags = useMemo(() => getProblemTags(summary.problems), [summary.problems]);
   const problems = useMemo(
-    () => [...filterProblems(summary.problems, { difficulty, search, tag })].sort((left, right) => compareProblems(left, right, sort)),
-    [difficulty, search, sort, summary.problems, tag],
+    () => filterAndSortProblems(summary.problems, filters, sort),
+    [filters, sort, summary.problems],
   );
   const selection = useProblemSelection(problems);
   const bulkDelete = useProblemDelete(selection.selectedProblemIds, refresh, selection.clear);
+  const pausedCount = summary.problems.filter((problem) => isProblemPaused(problem)).length;
+  const description = `共记录 ${summary.problems.length} 道题${pausedCount > 0 ? `（已暂停 ${pausedCount} 道）` : ''}，题目信息来自力扣中文站。`;
   return (
     <div className="view-content">
-      <PageHeading description={`共记录 ${summary.problems.length} 道题，题目信息来自力扣中文站。`} title="全部题目" />
+      <PageHeading description={description} title="全部题目" />
       <ProblemFilterBar
-        difficulty={difficulty}
-        onDifficultyChange={setDifficulty}
-        onReset={() => { setSearch(''); setDifficulty('ALL'); setTag('ALL'); }}
-        onSearchChange={setSearch}
+        filters={filters}
+        groups={groups}
+        onPatch={(patch) => setFilters((current) => ({ ...current, ...patch }))}
+        onReset={() => setFilters(INITIAL_FILTERS)}
         onSortChange={setSort}
-        onTagChange={setTag}
-        search={search}
         sort={sort}
-        tag={tag}
         tags={tags}
       />
+      <ProblemBatchToolbar groups={groups} onDone={selection.clear} refresh={refresh} selectedProblems={selection.selectedProblems} />
       {bulkDelete.error && <InlineNotice tone="error">{bulkDelete.error}</InlineNotice>}
-      <ProblemTable deleteState={bulkDelete} onToggle={selection.toggle} onToggleAll={selection.toggleAll} problems={problems} refresh={refresh} selection={selection} />
+      <ProblemTable deleteState={bulkDelete} groups={groups} onToggle={selection.toggle} onToggleAll={selection.toggleAll} problems={problems} refresh={refresh} selection={selection} />
     </div>
   );
 }
 
-type FilterBarProps = Readonly<{
-  difficulty: DifficultyFilter;
-  onDifficultyChange: (value: DifficultyFilter) => void;
-  onReset: () => void;
-  onSearchChange: (value: string) => void;
-  onSortChange: (value: ProblemSort) => void;
-  onTagChange: (value: string) => void;
-  search: string;
-  sort: ProblemSort;
-  tag: string;
-  tags: readonly string[];
-}>;
-
-function ProblemFilterBar({ difficulty, onDifficultyChange, onReset, onSearchChange, onSortChange, onTagChange, search, sort, tag, tags }: FilterBarProps): React.ReactElement {
+function ProblemFilterBar({ filters, groups, onPatch, onReset, onSortChange, sort, tags }: {
+  readonly filters: ProblemFilters;
+  readonly groups: readonly ReviewGroup[];
+  readonly onPatch: (patch: Partial<ProblemFilters>) => void;
+  readonly onReset: () => void;
+  readonly onSortChange: (value: ProblemSort) => void;
+  readonly sort: ProblemSort;
+  readonly tags: readonly string[];
+}): React.ReactElement {
   return (
     <div className="filter-bar">
-      <label className="search-field"><Icon name="search" size={17} /><input aria-label="搜索题目" onChange={(event) => onSearchChange(event.target.value)} placeholder="搜索题号、标题或标签" type="search" value={search} /></label>
-      <select aria-label="按难度筛选" onChange={(event) => onDifficultyChange(event.target.value as DifficultyFilter)} value={difficulty}>
+      <label className="search-field">
+        <Icon name="search" size={17} />
+        <input aria-label="搜索题目" onChange={(event) => onPatch({ search: event.target.value })} placeholder="搜索题号、标题或标签" type="search" value={filters.search} />
+      </label>
+      <select aria-label="按复习状态筛选" onChange={(event) => onPatch({ status: event.target.value as StatusFilter })} value={filters.status}>
+        <option value="ALL">全部状态</option><option value="ACTIVE">复习中</option><option value="PAUSED">已暂停</option>
+      </select>
+      <select aria-label="按难度筛选" onChange={(event) => onPatch({ difficulty: event.target.value as DifficultyFilter })} value={filters.difficulty}>
         <option value="ALL">全部难度</option><option value="EASY">简单</option><option value="MEDIUM">中等</option><option value="HARD">困难</option>
       </select>
-      <select aria-label="按标签筛选" onChange={(event) => onTagChange(event.target.value)} value={tag}>
+      <select aria-label="按高频题单筛选" onChange={(event) => onPatch({ list: event.target.value as ListFilter })} value={filters.list}>
+        <option value="ALL">全部题单</option>
+        {BUILTIN_PROBLEM_LISTS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+      </select>
+      {groups.length > 0 && (
+        <select aria-label="按分组筛选" onChange={(event) => onPatch({ group: event.target.value })} value={filters.group}>
+          <option value="ALL">全部分组</option><option value="DEFAULT">默认分组</option>
+          {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+      )}
+      <select aria-label="按标签筛选" onChange={(event) => onPatch({ tag: event.target.value })} value={filters.tag}>
         <option value="ALL">全部标签</option>{tags.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
       <select aria-label="排序方式" onChange={(event) => onSortChange(event.target.value as ProblemSort)} value={sort}>
         <option value="CREATED_AT_DESC">添加日期（最新优先）</option><option value="CREATED_AT_ASC">添加日期（最旧优先）</option>
         <option value="LAST_REVIEW_AT_DESC">最近复习日期（最新优先）</option><option value="LAST_REVIEW_AT_ASC">最近复习日期（最旧优先）</option>
       </select>
-      {(search || difficulty !== 'ALL' || tag !== 'ALL') && <Button onClick={onReset} tone="ghost">清除筛选</Button>}
+      {hasActiveFilters(filters) && <Button onClick={onReset} tone="ghost">清除筛选</Button>}
     </div>
   );
 }
@@ -86,8 +112,9 @@ function ProblemFilterBar({ difficulty, onDifficultyChange, onReset, onSearchCha
 type SelectionState = ReturnType<typeof useProblemSelection>;
 type DeleteState = ReturnType<typeof useProblemDelete>;
 
-function ProblemTable({ deleteState, onToggle, onToggleAll, problems, refresh, selection }: {
+function ProblemTable({ deleteState, groups, onToggle, onToggleAll, problems, refresh, selection }: {
   readonly deleteState: DeleteState;
+  readonly groups: readonly ReviewGroup[];
   readonly onToggle: (problemId: string) => void;
   readonly onToggleAll: () => void;
   readonly problems: readonly ProblemRecord[];
@@ -99,7 +126,9 @@ function ProblemTable({ deleteState, onToggle, onToggleAll, problems, refresh, s
       <ProblemTableHeader deleteState={deleteState} onToggleAll={onToggleAll} selection={selection} showSelectAll={problems.length > 0} />
       {problems.length === 0
         ? <EmptyState description="试试放宽搜索或筛选条件。" icon="search" title="没有匹配的题目" />
-        : problems.map((problem) => <ProblemTableRow busy={deleteState.deleting} key={problem.problemId} onToggle={() => onToggle(problem.problemId)} problem={problem} refresh={refresh} selected={selection.selectedIds.has(problem.problemId)} />)}
+        : problems.map((problem) => (
+          <ProblemTableRow busy={deleteState.deleting} groups={groups} key={problem.problemId} onToggle={() => onToggle(problem.problemId)} problem={problem} refresh={refresh} selected={selection.selectedIds.has(problem.problemId)} />
+        ))}
     </section>
   );
 }
@@ -127,44 +156,80 @@ function ProblemTableHeader({ deleteState, onToggleAll, selection, showSelectAll
   );
 }
 
-function ProblemTableRow({ busy, onToggle, problem, refresh, selected }: {
+function ProblemTableRow({ busy, groups, onToggle, problem, refresh, selected }: {
   readonly busy: boolean;
+  readonly groups: readonly ReviewGroup[];
   readonly onToggle: () => void;
   readonly problem: ProblemRecord;
   readonly refresh: () => Promise<void>;
   readonly selected: boolean;
 }): React.ReactElement {
-  const deletion = useProblemDelete([problem.problemId], refresh, noop);
-  const disabled = busy || deletion.deleting;
+  const paused = isProblemPaused(problem);
+  const group = resolveProblemGroup(problem, { reviewGroups: groups });
   return (
-    <article className={`problem-table__row${selected ? ' is-selected' : ''}`}>
+    <article className={`problem-table__row${selected ? ' is-selected' : ''}${paused ? ' is-paused' : ''}`}>
       <div className="problem-cell">
-        <input aria-label={`选择${problem.title}`} checked={selected} className="problem-check" disabled={disabled} onChange={onToggle} type="checkbox" />
+        <input aria-label={`选择${problem.title}`} checked={selected} className="problem-check" disabled={busy} onChange={onToggle} type="checkbox" />
         <span className="problem-cell__number">{problem.frontendId}</span>
-        <div><a href={problem.url} rel="noreferrer" target="_blank">{problem.title} <Icon name="external" size={13} /></a><small>记录于 {formatDate(problem.createdAt)} · {problem.tags.slice(0, 3).join(' / ')}</small></div>
+        <div>
+          <a href={problem.url} rel="noreferrer" target="_blank">{problem.title} <Icon name="external" size={13} /></a>
+          <small className="problem-cell__meta">
+            {paused && <span className="status-chip status-chip--paused">已暂停</span>}
+            {group && <span className="status-chip status-chip--group">{group.name} · {Math.round(group.requestRetention * 100)}%</span>}
+            <span>记录于 {formatDate(problem.createdAt)} · {problem.tags.slice(0, 3).join(' / ')}</span>
+          </small>
+        </div>
       </div>
       <DifficultyBadge difficulty={problem.difficulty} />
-      <span className="next-review">{formatDue(problem.nextReviewAt)}</span>
-      <div className="row-actions">
-        <a aria-label={`打开${problem.title}`} href={problem.url} rel="noreferrer" target="_blank"><Icon name="external" size={16} /></a>
-        <button aria-label={`${deletion.confirming ? '确认删除' : '删除'}${problem.title}`} className={deletion.confirming ? 'confirm-delete' : ''} disabled={disabled} onBlur={deletion.cancelConfirm} onClick={() => void deletion.remove()} type="button"><Icon name="trash" size={16} /><span>{deletion.confirming ? '再点一次确认' : '删除'}</span></button>
-        {deletion.error && <InlineNotice tone="error">{deletion.error}</InlineNotice>}
-      </div>
+      <span className="next-review">{paused ? '已暂停复习' : formatDue(problem.nextReviewAt)}</span>
+      <ProblemRowActions busy={busy} paused={paused} problem={problem} refresh={refresh} />
     </article>
   );
 }
 
-function useProblemSelection(problems: readonly ProblemRecord[]): {
-  readonly allSelected: boolean;
-  readonly clear: () => void;
-  readonly selectedCount: number;
-  readonly selectedIds: ReadonlySet<string>;
-  readonly selectedProblemIds: readonly string[];
-  readonly toggle: (problemId: string) => void;
-  readonly toggleAll: () => void;
-} {
+function ProblemRowActions({ busy, paused, problem, refresh }: {
+  readonly busy: boolean;
+  readonly paused: boolean;
+  readonly problem: ProblemRecord;
+  readonly refresh: () => Promise<void>;
+}): React.ReactElement {
+  const deletion = useProblemDelete([problem.problemId], refresh, noop);
+  const pause = useProblemPauseToggle(problem.problemId, paused, refresh);
+  const disabled = busy || deletion.deleting || pause.toggling;
+  const pauseActionLabel = paused ? '恢复复习' : '暂停复习';
+  const deleteActionLabel = deletion.confirming ? '确认删除' : '删除';
+  return (
+    <div className="row-actions">
+      <button aria-label={`${pauseActionLabel}${problem.title}`} disabled={disabled} onClick={() => void pause.toggle()} title={pauseActionLabel} type="button">
+        <Icon name={paused ? 'play' : 'pause'} size={15} /><span>{paused ? '恢复' : '暂停'}</span>
+      </button>
+      <a aria-label={`打开${problem.title}`} href={problem.url} rel="noreferrer" target="_blank"><Icon name="external" size={16} /></a>
+      <button aria-label={`${deleteActionLabel}${problem.title}`} className={deletion.confirming ? 'confirm-delete' : ''} disabled={disabled} onBlur={deletion.cancelConfirm} onClick={() => void deletion.remove()} type="button">
+        <Icon name="trash" size={16} /><span>{deletion.confirming ? '再点一次确认' : '删除'}</span>
+      </button>
+      {deletion.error && <InlineNotice tone="error">{deletion.error}</InlineNotice>}
+    </div>
+  );
+}
+
+function useProblemPauseToggle(problemId: string, paused: boolean, refresh: () => Promise<void>) {
+  const [toggling, setToggling] = useState(false);
+  const toggle = async (): Promise<void> => {
+    setToggling(true);
+    try {
+      await sendExtensionRequest({ type: 'problem.set-paused', payload: { problemIds: [problemId], paused: !paused } });
+      await refresh();
+    } finally {
+      setToggling(false);
+    }
+  };
+  return { toggle, toggling };
+}
+
+function useProblemSelection(problems: readonly ProblemRecord[]) {
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
-  const selectedProblemIds = problems.map((problem) => problem.problemId).filter((id) => selectedIds.has(id));
+  const selectedProblems = problems.filter((problem) => selectedIds.has(problem.problemId));
+  const selectedProblemIds = selectedProblems.map((problem) => problem.problemId);
   const selectedCount = selectedProblemIds.length;
   const allSelected = problems.length > 0 && selectedCount === problems.length;
   return {
@@ -173,7 +238,8 @@ function useProblemSelection(problems: readonly ProblemRecord[]): {
     selectedCount,
     selectedIds,
     selectedProblemIds,
-    toggle: (problemId) => {
+    selectedProblems,
+    toggle: (problemId: string) => {
       setSelectedIds((current) => {
         const next = new Set(current);
         if (next.has(problemId)) next.delete(problemId);
@@ -185,13 +251,7 @@ function useProblemSelection(problems: readonly ProblemRecord[]): {
   };
 }
 
-function useProblemDelete(problemIds: readonly string[], refresh: () => Promise<void>, onDeleted: () => void): {
-  readonly cancelConfirm: () => void;
-  readonly confirming: boolean;
-  readonly deleting: boolean;
-  readonly error: string | null;
-  readonly remove: () => Promise<void>;
-} {
+function useProblemDelete(problemIds: readonly string[], refresh: () => Promise<void>, onDeleted: () => void) {
   const selectionKey = problemIds.join('\0');
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -216,6 +276,13 @@ function useProblemDelete(problemIds: readonly string[], refresh: () => Promise<
   return { cancelConfirm: () => { setConfirmingKey(null); }, confirming, deleting, error, remove };
 }
 
+function hasActiveFilters(filters: ProblemFilters): boolean {
+  return Boolean(
+    filters.search || filters.difficulty !== 'ALL' || filters.status !== 'ALL'
+      || filters.group !== 'ALL' || filters.list !== 'ALL' || filters.tag !== 'ALL',
+  );
+}
+
 function bindIndeterminate(indeterminate: boolean) {
   return (element: HTMLInputElement | null): void => {
     if (element) element.indeterminate = indeterminate;
@@ -223,41 +290,3 @@ function bindIndeterminate(indeterminate: boolean) {
 }
 
 function noop(): void {}
-
-function getTags(problems: readonly ProblemRecord[]): readonly string[] {
-  return [...new Set(problems.flatMap((problem) => problem.tags))].sort((left, right) => left.localeCompare(right, 'zh-CN'));
-}
-
-function compareProblems(left: ProblemRecord, right: ProblemRecord, sort: ProblemSort): number {
-  const { dateField, direction } = SORT_OPTIONS[sort];
-  const bySelectedDate = compareOptionalTimestamp(getProblemTimestamp(left, dateField), getProblemTimestamp(right, dateField), direction);
-  if (bySelectedDate !== 0) return bySelectedDate;
-  const byCreated = compareTimestamp(left.createdAt, right.createdAt, direction);
-  if (byCreated !== 0) return byCreated;
-  return left.problemId.localeCompare(right.problemId);
-}
-
-function compareOptionalTimestamp(left: number | undefined, right: number | undefined, direction: SortDirection): number {
-  if (left === right) return 0;
-  if (left === undefined) return 1;
-  if (right === undefined) return -1;
-  return compareTimestamp(left, right, direction);
-}
-
-function compareTimestamp(left: number, right: number, direction: SortDirection): number {
-  return direction === 'ASC' ? left - right : right - left;
-}
-
-function getProblemTimestamp(problem: ProblemRecord, dateField: ProblemDateField): number | undefined {
-  return dateField === 'CREATED_AT' ? problem.createdAt : problem.fsrsCard?.last_review;
-}
-
-function filterProblems(problems: readonly ProblemRecord[], filters: ProblemFilters): readonly ProblemRecord[] {
-  const query = filters.search.trim().toLocaleLowerCase('zh-CN');
-  return problems.filter((problem) => {
-    if (filters.difficulty !== 'ALL' && problem.difficulty !== filters.difficulty) return false;
-    if (filters.tag !== 'ALL' && !problem.tags.includes(filters.tag)) return false;
-    if (!query) return true;
-    return [problem.frontendId, problem.title, problem.slug, ...problem.tags].some((value) => value.toLocaleLowerCase('zh-CN').includes(query));
-  });
-}

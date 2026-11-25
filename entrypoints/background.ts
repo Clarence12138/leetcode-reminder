@@ -16,9 +16,9 @@ import { isCloseHistoryTabRequest } from '../src/shared/history-port';
 
 export default defineBackground(() => {
   const database = new XiaoshuajiDatabase();
-  const store = new DexieReviewStore({ database });
   const localStoragePort = createChromeLocalStorage();
   const settings = new ChromeSettingsRepository(localStoragePort);
+  const store = new DexieReviewStore({ database, getSettings: () => settings.get() });
   const mirror = new ChromeDataMirror(store, localStoragePort);
   const reminders = new ReminderCoordinator({
     store,

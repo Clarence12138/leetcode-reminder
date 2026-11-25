@@ -52,12 +52,12 @@ function PopupFrame({ children }: React.PropsWithChildren): React.ReactElement {
 
 function PopupContent({ onRefresh, summary }: { readonly onRefresh: () => Promise<void>; readonly summary: DailySummary }): React.ReactElement {
   const problemMap = useMemo(() => new Map(summary.problems.map((problem) => [problem.problemId, problem])), [summary.problems]);
-  const dueCount = summary.dueProblems.length;
+  const dueCount = summary.dailyQuota ? summary.dailyQuota.remainingDue : summary.dueProblems.length;
   const pendingCount = summary.pendingReviews.length;
   const unreadIssueCount = summary.issues.filter((issue) => issue.readAt === null).length;
   return (
     <>
-      <ReviewHero dueCount={dueCount} pendingCount={pendingCount} />
+      <ReviewHero dueCount={dueCount} pendingCount={pendingCount} quota={summary.dailyQuota} />
       {pendingCount > 0 && (
         <PopupSection actionLabel="查看全部" onAction={() => openDashboard('#queue')} title="待评估">
           <div className="popup-list">
@@ -81,13 +81,25 @@ function PopupContent({ onRefresh, summary }: { readonly onRefresh: () => Promis
   );
 }
 
-function ReviewHero({ dueCount, pendingCount }: { readonly dueCount: number; readonly pendingCount: number }): React.ReactElement {
+function ReviewHero({
+  dueCount,
+  pendingCount,
+  quota,
+}: {
+  readonly dueCount: number;
+  readonly pendingCount: number;
+  readonly quota?: DailySummary['dailyQuota'];
+}): React.ReactElement {
   const allClear = dueCount === 0 && pendingCount === 0;
+  const quotaDone = allClear && quota !== undefined && quota.limit !== null && quota.overflowDue > 0;
   return (
     <section className={`review-hero ${allClear ? 'review-hero--clear' : ''}`}>
       <span className="review-hero__eyebrow"><Icon name={allClear ? 'sparkle' : 'calendar'} size={15} /> 今日学习</span>
       {allClear ? (
-        <><h1>今天的复习已完成</h1><p>很好，下次到期时我会提醒你。</p></>
+        <>
+          <h1>{quotaDone ? '今日配额已完成' : '今天的复习已完成'}</h1>
+          <p>{quotaDone ? `已完成 ${quota.completedToday}/${quota.limit} 题，另有 ${quota.overflowDue} 题积压可在面板查看。` : '很好，下次到期时我会提醒你。'}</p>
+        </>
       ) : (
         <><div className="review-hero__numbers"><strong>{dueCount}</strong><span>题待复习</span><i /><strong>{pendingCount}</strong><span>条待评估</span></div><p>先处理到期题目，再为新通过的提交选择掌握程度。</p></>
       )}

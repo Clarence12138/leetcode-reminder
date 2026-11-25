@@ -3,11 +3,13 @@ import {
   FSRS_LIBRARY_VERSION,
   FSRS_PARAMETERS_VERSION,
 } from '../domain/constants';
+import { resolveAutoGroupId } from '../domain/queue-policy';
 import type {
   HistoryImportResult,
   HistoryRatingMode,
   LeetCodeHistoryProblem,
   ProblemRecord,
+  Settings,
   SubmissionReview,
 } from '../domain/types';
 import { AppError } from './errors';
@@ -21,6 +23,7 @@ export interface HistoryImportOptions {
   readonly rating: HistoryRatingMode;
   readonly timezone: string;
   readonly now: number;
+  readonly settings?: Pick<Settings, 'reviewGroups' | 'autoGroupRules'>;
 }
 
 export interface HistoryImportPlan {
@@ -58,7 +61,7 @@ export function planHistoryImport(
     }
     seenProblems.add(problemId);
     claimSubmissions(accepted, claimedSubmissions);
-    problems.push(toProblemRecord(entry, options.now));
+    problems.push(toProblemRecord(entry, options));
     submissions.push(...accepted.map((submission) => toReview(problemId, submission, options)));
   }
 
@@ -123,13 +126,16 @@ function localDay(timestamp: number, timezone: string): string {
   }).format(timestamp);
 }
 
-function toProblemRecord(entry: LeetCodeHistoryProblem, now: number): ProblemRecord {
+function toProblemRecord(entry: LeetCodeHistoryProblem, options: HistoryImportOptions): ProblemRecord {
+  const groupId = options.settings ? resolveAutoGroupId(entry.metadata.slug, options.settings) : null;
   return {
     ...entry.metadata,
-    createdAt: now,
-    updatedAt: now,
+    createdAt: options.now,
+    updatedAt: options.now,
     fsrsCard: null,
     nextReviewAt: null,
+    pausedAt: null,
+    groupId,
     algorithm: FSRS_ALGORITHM,
     algorithmLibrary: FSRS_LIBRARY_VERSION,
     parametersVersion: FSRS_PARAMETERS_VERSION,

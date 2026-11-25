@@ -4,12 +4,15 @@ import {
   generatorParameters,
   Rating,
   type Card,
+  type FSRSParameters,
   type Grade,
   type ReviewLog,
 } from 'ts-fsrs';
 
 import {
+  FSRS_MAX_RETENTION,
   FSRS_MAXIMUM_INTERVAL_DAYS,
+  FSRS_MIN_RETENTION,
   FSRS_REQUEST_RETENTION,
 } from '../domain/constants';
 import type {
@@ -21,14 +24,11 @@ import type {
 } from '../domain/types';
 import { AppError } from './errors';
 
-const PARAMETERS = generatorParameters({
-  request_retention: FSRS_REQUEST_RETENTION,
-  maximum_interval: FSRS_MAXIMUM_INTERVAL_DAYS,
-  enable_fuzz: false,
-  enable_short_term: false,
-  learning_steps: [],
-  relearning_steps: [],
-});
+export interface FsrsReplayOptions {
+  readonly requestRetention?: number;
+}
+
+const PARAMETER_CACHE = new Map<number, FSRSParameters>();
 
 const RATING_MAP: Readonly<Record<MasteryRating, Grade>> = {
   AGAIN: Rating.Again,
@@ -49,18 +49,33 @@ export interface ReplayResult {
   readonly reviews: readonly SubmissionReview[];
 }
 
-export function getFsrsParameters() {
-  return PARAMETERS;
+export function getFsrsParameters(requestRetention = FSRS_REQUEST_RETENTION): FSRSParameters {
+  const normalized = normalizeRetention(requestRetention);
+  const cached = PARAMETER_CACHE.get(normalized);
+  if (cached) return cached;
+  const parameters = generatorParameters({
+    request_retention: normalized,
+    maximum_interval: FSRS_MAXIMUM_INTERVAL_DAYS,
+    enable_fuzz: false,
+    enable_short_term: false,
+    learning_steps: [],
+    relearning_steps: [],
+  });
+  PARAMETER_CACHE.set(normalized, parameters);
+  return parameters;
 }
 
-export function replayReviews(reviews: readonly SubmissionReview[]): ReplayResult {
+export function replayReviews(
+  reviews: readonly SubmissionReview[],
+  options: FsrsReplayOptions = {},
+): ReplayResult {
   const ordered = orderReviews(reviews);
   const rated = ordered.filter(hasRating);
   if (rated.length === 0) {
     return { card: null, reviews: reviews.map(clearLog) };
   }
 
-  const scheduler = fsrs(PARAMETERS);
+  const scheduler = fsrs(getFsrsParameters(options.requestRetention));
   let card: Card = createEmptyCard(new Date(rated[0]!.acceptedAt));
   const logs = new Map<string, SerializedFsrsLog>();
 
@@ -82,6 +97,7 @@ export function replayReviews(reviews: readonly SubmissionReview[]): ReplayResul
 export function previewPendingReview(
   reviews: readonly SubmissionReview[],
   submissionId: string,
+  options: FsrsReplayOptions = {},
 ): ReviewPreview {
   const pending = reviews.find((review) => review.submissionId === submissionId);
   if (!pending) {
@@ -96,13 +112,18 @@ export function previewPendingReview(
       const hypothetical = reviews.map((review) =>
         review.submissionId === pending.submissionId ? { ...review, rating } : review,
       );
-      const due = replayReviews(hypothetical).card?.due;
+      const due = replayReviews(hypothetical, options).card?.due;
       if (due === undefined) {
         throw new AppError('FSRS_PREVIEW_FAILED', '无法生成 FSRS 预览');
       }
       return [rating, due];
     }),
   ) as unknown as ReviewPreview;
+}
+
+function normalizeRetention(retention: number): number {
+  const clamped = Math.min(FSRS_MAX_RETENTION, Math.max(FSRS_MIN_RETENTION, retention));
+  return Math.round(clamped * 1000) / 1000;
 }
 
 function orderReviews(reviews: readonly SubmissionReview[]): SubmissionReview[] {

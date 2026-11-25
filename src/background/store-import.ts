@@ -3,13 +3,15 @@ import {
   FSRS_LIBRARY_VERSION,
   FSRS_PARAMETERS_VERSION,
 } from '../domain/constants';
+import { resolveRequestRetention } from '../domain/queue-policy';
 import type {
   DetectionIssue,
   ProblemRecord,
+  Settings,
   SubmissionReview,
 } from '../domain/types';
 import { AppError } from './errors';
-import type { ReplayResult } from './fsrs';
+import type { FsrsReplayOptions, ReplayResult } from './fsrs';
 
 export interface PersistedSnapshot {
   readonly problems: readonly ProblemRecord[];
@@ -17,13 +19,17 @@ export interface PersistedSnapshot {
   readonly issues: readonly DetectionIssue[];
 }
 
-type Replay = (reviews: readonly SubmissionReview[]) => ReplayResult;
+export type Replay = (
+  reviews: readonly SubmissionReview[],
+  options?: FsrsReplayOptions,
+) => ReplayResult;
 
 export function prepareImportedSnapshot(options: {
   readonly current: PersistedSnapshot;
   readonly incoming: PersistedSnapshot;
   readonly mode: 'merge' | 'replace';
   readonly replay: Replay;
+  readonly settings?: Pick<Settings, 'defaultRequestRetention' | 'reviewGroups'> | undefined;
 }): PersistedSnapshot {
   assertUniqueIncoming(options.incoming);
   const source =
@@ -32,7 +38,7 @@ export function prepareImportedSnapshot(options: {
       : mergeSnapshots(options.current, options.incoming);
   assertProblemIdentities(source.problems);
   assertSubmissionReferences(source);
-  return rebuildDerivedState(source, options.replay);
+  return rebuildDerivedState(source, options.replay, options.settings);
 }
 
 function normalizeSnapshot(snapshot: PersistedSnapshot): PersistedSnapshot {
@@ -155,16 +161,24 @@ function assertProblemIdentities(problems: readonly ProblemRecord[]): void {
   }
 }
 
-function rebuildDerivedState(snapshot: PersistedSnapshot, replay: Replay): PersistedSnapshot {
+function rebuildDerivedState(
+  snapshot: PersistedSnapshot,
+  replay: Replay,
+  settings?: Pick<Settings, 'defaultRequestRetention' | 'reviewGroups'>,
+): PersistedSnapshot {
+  const validGroups = settings ? new Set(settings.reviewGroups.map((group) => group.id)) : null;
   const reviewsByProblem = groupReviews(snapshot.submissions);
   const rebuiltReviews = new Map<string, SubmissionReview>();
   const problems = snapshot.problems.map((problem) => {
-    const result = replay(reviewsByProblem.get(problem.problemId) ?? []);
+    const normalizedGroupId = normalizeGroupId(problem.groupId ?? null, validGroups);
+    const normalizedProblem = { ...problem, groupId: normalizedGroupId, pausedAt: problem.pausedAt ?? null };
+    const requestRetention = resolveRequestRetention(normalizedProblem, settings);
+    const result = replay(reviewsByProblem.get(problem.problemId) ?? [], { requestRetention });
     for (const review of result.reviews) {
       rebuiltReviews.set(review.submissionId, review);
     }
     return {
-      ...problem,
+      ...normalizedProblem,
       fsrsCard: result.card,
       nextReviewAt: result.card?.due ?? null,
       algorithm: FSRS_ALGORITHM as 'FSRS-6',
@@ -184,6 +198,15 @@ function rebuildDerivedState(snapshot: PersistedSnapshot, replay: Replay): Persi
     }),
     issues: snapshot.issues.map(stripIssueId),
   };
+}
+
+function normalizeGroupId(
+  groupId: string | null,
+  validGroups: ReadonlySet<string> | null,
+): string | null {
+  if (groupId === null) return null;
+  if (validGroups === null) return groupId;
+  return validGroups.has(groupId) ? groupId : null;
 }
 
 function groupReviews(

@@ -1,3 +1,4 @@
+import type { BuiltinProblemListId } from './problem-lists';
 import type {
   BackupV2,
   DailySummary,
@@ -90,6 +91,21 @@ export type ExtensionRequest =
   | {
       readonly type: 'problem.delete';
       readonly payload: { readonly problemIds: readonly string[] };
+    }
+  | {
+      readonly type: 'problem.set-paused';
+      readonly payload: { readonly problemIds: readonly string[]; readonly paused: boolean };
+    }
+  | {
+      readonly type: 'problem.set-group';
+      readonly payload: { readonly problemIds: readonly string[]; readonly groupId: string | null };
+    }
+  | {
+      readonly type: 'problem.apply-list-group';
+      readonly payload: {
+        readonly listIds: readonly BuiltinProblemListId[];
+        readonly groupId: string | null;
+      };
     };
 
 export type ExtensionResponse =
@@ -119,6 +135,10 @@ export type TypedResponse<T extends ExtensionRequest['type']> =
               ? { readonly updatedCount: number }
               : T extends 'problem.delete'
                 ? { readonly deletedCount: number }
-                : T extends 'history.import'
-                  ? HistoryImportResult
-                  : unknown;
+                : T extends 'problem.set-paused' | 'problem.set-group'
+                  ? { readonly updatedCount: number }
+                  : T extends 'problem.apply-list-group'
+                    ? { readonly updatedCount: number; readonly matchedCount: number }
+                    : T extends 'history.import'
+                      ? HistoryImportResult
+                      : unknown;
