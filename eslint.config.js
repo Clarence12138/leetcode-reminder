@@ -10,6 +10,7 @@ export default tseslint.config(
       'coverage/**',
       'store-assets/**',
       'scripts/**',
+      'design-drafts/**',
       'eslint.config.js',
     ],
   },
