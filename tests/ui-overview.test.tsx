@@ -162,7 +162,8 @@ describe('面板 · 外壳与路由', () => {
     });
     render(<DashboardApp />);
     const navigation = await screen.findByRole('navigation', { name: '主导航' });
-    expect(within(navigation).getAllByRole('button').map((button) => button.textContent)).toEqual(['概览3', '题库', '记录1', '设置']);
+    // 导航先于数据渲染，等角标出现后再断言（CI 机器较慢时会先拿到没有角标的导航）
+    await waitFor(() => expect(within(navigation).getAllByRole('button').map((button) => button.textContent)).toEqual(['概览3', '题库', '记录1', '设置']));
     expect(within(navigation).getByRole('button', { name: /记录/ }).querySelector('b')).toHaveTextContent('1');
   });
 
