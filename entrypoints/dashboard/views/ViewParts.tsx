@@ -1,65 +1,11 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { resolveProblemGroup } from '../../../src/domain/queue-policy';
-import type { ProblemRecord, Settings, SubmissionReview, SubmissionTrigger } from '../../../src/domain/types';
-import { withReviewResetIntent } from '../../../src/leetcode/url';
-import { DifficultyBadge } from '../../../src/ui/components';
-import { formatDateTime, formatDue, problemName } from '../../../src/ui/format';
-import { Icon } from '../../../src/ui/Icon';
+import { Card } from '../../../src/ui/components';
 
-const triggerLabel: Readonly<Record<SubmissionTrigger, string>> = {
-  button: '按钮提交',
-  keyboard: '快捷键提交',
-  import: '从力扣导入',
-};
-
-export function Panel({ children, className = '', title, action }: PropsWithChildren<{ readonly action?: ReactNode; readonly className?: string; readonly title: string }>): React.ReactElement {
-  return (
-    <section className={`panel ${className}`.trim()}>
-      <header className="panel__header"><h2>{title}</h2>{action}</header>
-      {children}
-    </section>
-  );
-}
-
-export function ProblemRow({
-  compact = false,
-  problem,
-  reviewJump = false,
-  settings,
-}: {
-  readonly compact?: boolean;
-  readonly problem: ProblemRecord;
-  readonly reviewJump?: boolean;
-  readonly settings?: Pick<Settings, 'reviewGroups'> | undefined;
-}): React.ReactElement {
-  const dueLabel = formatDue(problem.nextReviewAt);
-  const isOverdue = dueLabel.startsWith('逾期') || dueLabel === '昨天到期';
-  const href = reviewJump ? withReviewResetIntent(problem.url) : problem.url;
-  const group = settings ? resolveProblemGroup(problem, settings) : null;
-  return (
-    <article className="problem-row">
-      <span className="problem-row__number">{problem.frontendId}</span>
-      <div className="problem-row__main">
-        <a href={href} rel="noreferrer" target="_blank">{problem.title} <Icon name="external" size={13} /></a>
-        {!compact && (
-          <span className="tag-line">
-            {group && <i className="group-chip">{group.name} · {Math.round(group.requestRetention * 100)}%</i>}
-            {problem.tags.slice(0, 3).map((tag) => <i key={tag}>{tag}</i>)}
-          </span>
-        )}
-      </div>
-      <DifficultyBadge difficulty={problem.difficulty} />
-      <time className={isOverdue ? 'is-overdue' : ''}>{dueLabel}</time>
-    </article>
-  );
-}
-
-export function ReviewRow({ problem, review }: { readonly problem: ProblemRecord | undefined; readonly review: SubmissionReview }): React.ReactElement {
-  return (
-    <article className="review-row">
-      <span className="review-row__icon"><Icon name="check" size={15} /></span>
-      <div><strong>{problemName(problem, review)}</strong><span>{triggerLabel[review.trigger]}</span></div>
-      <time>{formatDateTime(review.acceptedAt)}</time>
-    </article>
-  );
+/** 带标题的卡片区块（设置页等仍在使用），内部就是共用的 `Card`。 */
+export function Panel({ action, children, className, title }: PropsWithChildren<{
+  readonly action?: ReactNode;
+  readonly className?: string;
+  readonly title: string;
+}>): React.ReactElement {
+  return <Card {...(className === undefined ? {} : { className })} aside={action} title={title}>{children}</Card>;
 }

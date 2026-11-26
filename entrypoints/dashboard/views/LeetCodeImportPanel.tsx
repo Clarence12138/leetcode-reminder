@@ -4,10 +4,10 @@ import type { HistoryImportResult, HistoryRatingMode, MasteryRating } from '../.
 import type { HistoryFetchResult } from '../../../src/leetcode/history-fetcher';
 import type { HistoryImportState } from '../../../src/shared/history-import-state';
 import { sendExtensionRequest } from '../../../src/shared/messaging';
-import { Button, InlineNotice } from '../../../src/ui/components';
+import { Button, InlineNotice, Segmented } from '../../../src/ui/components';
 import { ratingLabel } from '../../../src/ui/format';
 import { HistoryImportContext } from '../useHistoryImport';
-import { Panel } from './ViewParts';
+import { SettingRow } from './settings/parts';
 
 const RATINGS: readonly MasteryRating[] = ['AGAIN', 'HARD', 'GOOD', 'EASY'];
 
@@ -33,32 +33,34 @@ export function LeetCodeImportPanel(): React.ReactElement {
   };
   const ratingMode: HistoryRatingMode = mode === 'uniform' ? { mode, rating } : { mode };
   return (
-    <Panel title="从力扣导入">
-      <p className="panel__hint">读取你在力扣中文站已通过的题目和 AC 记录，导入本地还没有的题目；本地已有的题目保持不变。需要先在本浏览器登录 leetcode.cn。导入时会临时打开一个力扣后台标签页并逐个请求，题目较多时需要几分钟，导入在后台进行，可以切换页面或关闭面板，完成后自动关闭临时标签页。</p>
-      <div className="settings-form">
-        <div className="setting-row">
-          <div><strong>评分方式</strong><p>{modeDescription(mode)}</p></div>
-          <div className="import-actions">
-            <select aria-label="导入评分方式" disabled={running} onChange={(event) => setMode(event.target.value as Mode)} value={mode}>
-              <option value="uniform">统一评为</option>
-              <option value="manual">导入后自己补评</option>
-            </select>
-            {mode === 'uniform' && (
-              <select aria-label="统一评分档位" disabled={running} onChange={(event) => setRating(event.target.value as MasteryRating)} value={rating}>
-                {RATINGS.map((value) => <option key={value} value={value}>{ratingLabel[value]}</option>)}
-              </select>
-            )}
-          </div>
+    <div className="import-block">
+      <p className="sec-desc">读取你在力扣中文站已通过的题目和 AC 记录，导入本地还没有的题目；本地已有的题目保持不变。需要先在本浏览器登录 leetcode.cn。导入时会临时打开一个力扣后台标签页并逐个请求，题目较多时需要几分钟，导入在后台进行，可以切换页面或关闭面板，完成后自动关闭临时标签页。</p>
+      <SettingRow description={modeDescription(mode)} label="评分方式">
+        <div className="import-actions">
+          <select aria-label="导入评分方式" className="select" disabled={running} onChange={(event) => setMode(event.target.value as Mode)} value={mode}>
+            <option value="uniform">统一评为</option>
+            <option value="manual">导入后自己补评</option>
+          </select>
+          {mode === 'uniform' && (
+            <Segmented
+              ariaLabel="统一评分档位"
+              disabled={running}
+              onChange={setRating}
+              options={RATINGS.map((value) => ({ value, label: ratingLabel[value] }))}
+              size="sm"
+              value={rating}
+            />
+          )}
         </div>
-        {running && <InlineNotice>{progressText(state)}</InlineNotice>}
-        {!running && notice && <InlineNotice tone={notice.tone}>{notice.text}</InlineNotice>}
-        <div className="settings-actions">
-          {running
-            ? <Button disabled={state.status === 'running' && state.phase === 'committing'} onClick={() => void send({ type: 'history.cancel' })}>取消导入</Button>
-            : <Button icon="download" onClick={() => void send({ type: 'history.start', payload: { rating: ratingMode } })} tone="primary">开始导入</Button>}
-        </div>
+      </SettingRow>
+      {running && <InlineNotice>{progressText(state)}</InlineNotice>}
+      {!running && notice && <InlineNotice tone={notice.tone}>{notice.text}</InlineNotice>}
+      <div className="import-footer">
+        {running
+          ? <Button disabled={state.status === 'running' && state.phase === 'committing'} onClick={() => void send({ type: 'history.cancel' })}>取消导入</Button>
+          : <Button icon="download" onClick={() => void send({ type: 'history.start', payload: { rating: ratingMode } })} tone="primary">开始导入</Button>}
       </div>
-    </Panel>
+    </div>
   );
 }
 

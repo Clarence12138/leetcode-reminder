@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import type { BuiltinProblemListId } from '../../../src/domain/problem-lists';
 import type { AutoGroupRule, DailySummary, ReviewGroup, Settings } from '../../../src/domain/types';
 import { sendExtensionRequest } from '../../../src/shared/messaging';
-import { Button, InlineNotice } from '../../../src/ui/components';
+import { Button, InlineNotice, Pill, Stepper } from '../../../src/ui/components';
 import { BuiltinListsSection, countProblemsByList } from './BuiltinListsSection';
-import { Panel } from './ViewParts';
-
-const RETENTION_PRESETS = [0.8, 0.85, 0.9] as const;
+import { RetentionStepper, formatPercent, RETENTION_MAX, RETENTION_MIN } from './settings/RetentionStepper';
+import { Section } from './settings/parts';
+import { useMarkSaved } from './settings/saved';
 
 interface Notice {
   readonly tone: 'error' | 'success';
@@ -22,37 +22,35 @@ export function ReviewGroupsPanel({ refresh, settings, summary }: {
   const countsByGroup = useMemo(() => countProblemsByGroup(summary.problems), [summary.problems]);
   const countsByList = useMemo(() => countProblemsByList(summary.problems), [summary.problems]);
   return (
-    <Panel title="目标保持率与题目分组">
-      <div className="settings-form">
-        <DefaultRetentionRow busy={controller.busy} defaultCount={countsByGroup.get(null) ?? 0} onChange={(value) => void controller.updateDefaultRetention(value)} value={settings.defaultRequestRetention} />
-        <GroupManagerSection
-          busy={controller.busy}
-          countsByGroup={countsByGroup}
-          groupName={controller.groupName}
-          groupRetention={controller.groupRetention}
-          groups={settings.reviewGroups}
-          onAdd={() => void controller.addGroup(controller.groupName, controller.groupRetention)}
-          onDelete={(group) => void controller.deleteGroup(group)}
-          onNameChange={controller.setGroupName}
-          onQuickAdd={() => void controller.addGroup('高频核心', 0.9)}
-          onRetentionChange={controller.setGroupRetention}
-          onUpdateRetention={(id, value) => void controller.updateGroupRetention(id, value)}
-        />
-        <BuiltinListsSection
-          applyTargetGroup={controller.applyTargetGroup}
-          autoGroupRules={settings.autoGroupRules}
-          busy={controller.busy}
-          countsByList={countsByList}
-          groups={settings.reviewGroups}
-          onApply={() => void controller.applyLists()}
-          onAutoRuleChange={(listId, groupId) => void controller.setAutoRule(listId, groupId)}
-          onTargetGroupChange={controller.setApplyTargetGroup}
-          onToggleList={controller.toggleList}
-          selectedLists={controller.selectedLists}
-        />
-        {controller.notice && <InlineNotice tone={controller.notice.tone}>{controller.notice.text}</InlineNotice>}
-      </div>
-    </Panel>
+    <Section description="不同分组可以设不同的目标保持率，比如面试前把高频题调高；也可用内置高频题单一键归组。" id="settings-groups" title="分组与题单">
+      <GroupManagerSection
+        busy={controller.busy}
+        countsByGroup={countsByGroup}
+        defaultRetention={settings.defaultRequestRetention}
+        groupName={controller.groupName}
+        groupRetention={controller.groupRetention}
+        groups={settings.reviewGroups}
+        onAdd={() => void controller.addGroup(controller.groupName, controller.groupRetention)}
+        onDelete={(group) => void controller.deleteGroup(group)}
+        onNameChange={controller.setGroupName}
+        onQuickAdd={() => void controller.addGroup('高频核心', 0.9)}
+        onRetentionChange={controller.setGroupRetention}
+        onUpdateRetention={(id, value) => controller.updateGroupRetention(id, value)}
+      />
+      <BuiltinListsSection
+        applyTargetGroup={controller.applyTargetGroup}
+        autoGroupRules={settings.autoGroupRules}
+        busy={controller.busy}
+        countsByList={countsByList}
+        groups={settings.reviewGroups}
+        onApply={() => void controller.applyLists()}
+        onAutoRuleChange={(listId, groupId) => void controller.setAutoRule(listId, groupId)}
+        onTargetGroupChange={controller.setApplyTargetGroup}
+        onToggleList={controller.toggleList}
+        selectedLists={controller.selectedLists}
+      />
+      {controller.notice && <InlineNotice tone={controller.notice.tone}>{controller.notice.text}</InlineNotice>}
+    </Section>
   );
 }
 
@@ -63,7 +61,6 @@ function useReviewGroupsController(settings: Settings, refresh: () => Promise<vo
   const [applyTargetGroup, setApplyTargetGroup] = useState<string>(() => settings.reviewGroups[0]?.id ?? '');
   const { busy, notice, runUpdate } = useNoticeRunner(refresh);
 
-  const updateDefaultRetention = (retention: number) => runUpdate(() => saveDefaultRetention(retention));
   const addGroup = (name: string, retention: number) => runUpdate(async () => {
     const { id, text } = await createReviewGroup(name, retention, settings.reviewGroups);
     setGroupName('');
@@ -88,13 +85,8 @@ function useReviewGroupsController(settings: Settings, refresh: () => Promise<vo
   return {
     addGroup, applyLists, applyTargetGroup, busy, deleteGroup, groupName, groupRetention, notice,
     selectedLists, setApplyTargetGroup, setAutoRule, setGroupName, setGroupRetention, toggleList,
-    updateDefaultRetention, updateGroupRetention,
+    updateGroupRetention,
   };
-}
-
-async function saveDefaultRetention(retention: number): Promise<string> {
-  await sendExtensionRequest({ type: 'settings.update', payload: { defaultRequestRetention: retention } });
-  return `默认目标保持率已更新为 ${formatPercent(retention)}，已重算相关题目排期。`;
 }
 
 async function createReviewGroup(name: string, retention: number, existing: readonly ReviewGroup[]) {
@@ -110,12 +102,12 @@ async function saveGroupRetention(
   groups: readonly ReviewGroup[],
   groupId: string,
   retention: number,
-): Promise<string> {
+): Promise<string | null> {
   const reviewGroups = groups.map((group) =>
     group.id === groupId ? { ...group, requestRetention: retention } : group,
   );
   await sendExtensionRequest({ type: 'settings.update', payload: { reviewGroups } });
-  return `分组保持率已调整为 ${formatPercent(retention)}，已重算该组排期。`;
+  return null;
 }
 
 async function removeReviewGroup(groups: readonly ReviewGroup[], target: ReviewGroup) {
@@ -145,17 +137,22 @@ async function applyListsToGroup(
 }
 
 function useNoticeRunner(refresh: () => Promise<void>) {
+  const markSaved = useMarkSaved();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const runUpdate = async (task: () => Promise<string>): Promise<void> => {
+  /** 返回是否成功；task 返回 null 表示只提示「已保存」、不另显示结果文案。 */
+  const runUpdate = async (task: () => Promise<string | null>): Promise<boolean> => {
     setBusy(true);
     setNotice(null);
     try {
       const text = await task();
       await refresh();
-      setNotice({ tone: 'success', text });
+      markSaved();
+      if (text) setNotice({ tone: 'success', text });
+      return true;
     } catch (cause) {
       setNotice({ tone: 'error', text: cause instanceof Error ? cause.message : '操作失败' });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -163,32 +160,10 @@ function useNoticeRunner(refresh: () => Promise<void>) {
   return { busy, notice, runUpdate };
 }
 
-function DefaultRetentionRow({ busy, defaultCount, onChange, value }: {
-  readonly busy: boolean;
-  readonly defaultCount: number;
-  readonly onChange: (retention: number) => void;
-  readonly value: number;
-}): React.ReactElement {
-  return (
-    <div className="setting-row">
-      <div>
-        <strong>默认目标保持率（当前默认组 {defaultCount} 题）</strong>
-        <p>保持率越低，FSRS 复习间隔越长、负担越轻；可将低频题留在默认组 80%，高频题单独设为 90%。</p>
-      </div>
-      <div className="preset-group">
-        {RETENTION_PRESETS.map((preset) => (
-          <button className={`preset-pill${Math.abs(value - preset) < 0.001 ? ' is-active' : ''}`} disabled={busy} key={preset} onClick={() => onChange(preset)} type="button">
-            {formatPercent(preset)}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function GroupManagerSection(props: {
   readonly busy: boolean;
   readonly countsByGroup: ReadonlyMap<string | null, number>;
+  readonly defaultRetention: number;
   readonly groupName: string;
   readonly groupRetention: number;
   readonly groups: readonly ReviewGroup[];
@@ -197,33 +172,27 @@ function GroupManagerSection(props: {
   readonly onNameChange: (value: string) => void;
   readonly onQuickAdd: () => void;
   readonly onRetentionChange: (value: number) => void;
-  readonly onUpdateRetention: (groupId: string, value: number) => void;
+  readonly onUpdateRetention: (groupId: string, value: number) => Promise<boolean>;
 }): React.ReactElement {
   return (
-    <div className="groups-section">
-      <div className="groups-section__header">
-        <div>
-          <strong>自定义复习分组</strong>
-          <p>为高频面试题和低频巩固题分别设置 FSRS 目标保持率（70%–95%）。</p>
-        </div>
-        {props.groups.length === 0 && (
-          <Button disabled={props.busy} icon="plus" onClick={props.onQuickAdd}>快捷创建「高频核心 90%」</Button>
-        )}
+    <div className="groups-block">
+      <GroupsHeader busy={props.busy} empty={props.groups.length === 0} onQuickAdd={props.onQuickAdd} />
+      <div className="grow">
+        <div><b>默认分组</b><small>未分组的题目</small></div>
+        <span className="cnt">{props.countsByGroup.get(null) ?? 0} 道题</span>
+        <Pill>跟随默认 {formatPercent(props.defaultRetention)}</Pill>
+        <span />
       </div>
-      {props.groups.length > 0 && (
-        <div className="group-list">
-          {props.groups.map((group) => (
-            <GroupRow
-              busy={props.busy}
-              count={props.countsByGroup.get(group.id) ?? 0}
-              group={group}
-              key={group.id}
-              onDelete={() => props.onDelete(group)}
-              onUpdateRetention={(value) => props.onUpdateRetention(group.id, value)}
-            />
-          ))}
-        </div>
-      )}
+      {props.groups.map((group) => (
+        <GroupRow
+          busy={props.busy}
+          count={props.countsByGroup.get(group.id) ?? 0}
+          group={group}
+          key={group.id}
+          onDelete={() => props.onDelete(group)}
+          onUpdateRetention={(value) => props.onUpdateRetention(group.id, value)}
+        />
+      ))}
       <GroupCreateForm
         busy={props.busy}
         groupName={props.groupName}
@@ -236,22 +205,31 @@ function GroupManagerSection(props: {
   );
 }
 
+function GroupsHeader({ busy, empty, onQuickAdd }: { readonly busy: boolean; readonly empty: boolean; readonly onQuickAdd: () => void }): React.ReactElement {
+  return (
+    <div className="block-head">
+      <div>
+        <b>自定义复习分组</b>
+        <small>为高频面试题和低频巩固题分别设置 FSRS 目标保持率（{formatPercent(RETENTION_MIN)}–{formatPercent(RETENTION_MAX)}）。</small>
+      </div>
+      {empty && <Button disabled={busy} icon="plus" onClick={onQuickAdd} size="sm">快捷创建「高频核心 90%」</Button>}
+    </div>
+  );
+}
+
 function GroupRow({ busy, count, group, onDelete, onUpdateRetention }: {
   readonly busy: boolean;
   readonly count: number;
   readonly group: ReviewGroup;
   readonly onDelete: () => void;
-  readonly onUpdateRetention: (value: number) => void;
+  readonly onUpdateRetention: (value: number) => Promise<boolean>;
 }): React.ReactElement {
   return (
-    <div className="group-item">
-      <div><strong>{group.name}</strong><span>{count} 道题</span></div>
-      <div className="group-item__controls">
-        <select aria-label={`${group.name}保持率`} disabled={busy} onChange={(event) => onUpdateRetention(Number(event.target.value))} value={group.requestRetention}>
-          {retentionOptions(group.requestRetention).map((rate) => <option key={rate} value={rate}>{formatPercent(rate)}</option>)}
-        </select>
-        <Button disabled={busy} icon="trash" onClick={onDelete} tone="ghost">删除</Button>
-      </div>
+    <div className="grow">
+      <div><b>{group.name}</b></div>
+      <span className="cnt">{count} 道题</span>
+      <RetentionStepper disabled={busy} label={`${group.name}保持率`} onCommit={onUpdateRetention} value={group.requestRetention} />
+      <Button aria-label={`删除分组${group.name}`} disabled={busy} icon="trash" onClick={onDelete} size="sm" tone="ghost">删除</Button>
     </div>
   );
 }
@@ -266,11 +244,11 @@ function GroupCreateForm({ busy, groupName, groupRetention, onAdd, onNameChange,
 }): React.ReactElement {
   return (
     <div className="group-create">
-      <input aria-label="新分组名称" disabled={busy} maxLength={32} onChange={(event) => onNameChange(event.target.value)} placeholder="如：大厂高频、冲刺核心" type="text" value={groupName} />
-      <select aria-label="新分组目标保持率" disabled={busy} onChange={(event) => onRetentionChange(Number(event.target.value))} value={groupRetention}>
-        {[0.75, 0.8, 0.85, 0.9, 0.92, 0.95].map((rate) => <option key={rate} value={rate}>保持率 {formatPercent(rate)}</option>)}
-      </select>
-      <Button disabled={busy || !groupName.trim()} icon="plus" onClick={onAdd} tone="primary">新建分组</Button>
+      <label className="field">
+        <input aria-label="新分组名称" disabled={busy} maxLength={32} onChange={(event) => onNameChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && groupName.trim()) onAdd(); }} placeholder="如：大厂高频、冲刺核心" type="text" value={groupName} />
+      </label>
+      <Stepper disabled={busy} format={formatPercent} label="新分组目标保持率" max={RETENTION_MAX} min={RETENTION_MIN} onChange={onRetentionChange} step={0.01} value={groupRetention} />
+      <Button disabled={busy || !groupName.trim()} icon="plus" onClick={onAdd} size="sm" tone="primary">新建分组</Button>
     </div>
   );
 }
@@ -291,13 +269,4 @@ function createGroupId(name: string, existing: readonly ReviewGroup[]): string {
   let suffix = 2;
   while (taken.has(`${base}-${suffix}`)) suffix += 1;
   return `${base}-${suffix}`;
-}
-
-function retentionOptions(current: number): readonly number[] {
-  const base = [0.75, 0.8, 0.85, 0.9, 0.92, 0.95];
-  return base.includes(current) ? base : [...base, current].sort((left, right) => left - right);
-}
-
-function formatPercent(value: number): string {
-  return `${Math.round(value * 100)}%`;
 }

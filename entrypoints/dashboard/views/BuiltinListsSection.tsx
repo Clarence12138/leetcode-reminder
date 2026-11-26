@@ -5,7 +5,8 @@ import {
   type BuiltinProblemListId,
 } from '../../../src/domain/problem-lists';
 import type { AutoGroupRule, DailySummary, ReviewGroup } from '../../../src/domain/types';
-import { Button } from '../../../src/ui/components';
+import { Button, Checkbox } from '../../../src/ui/components';
+import { formatPercent } from './settings/RetentionStepper';
 
 export function countProblemsByList(problems: DailySummary['problems']): Map<BuiltinProblemListId, number> {
   const counts = new Map<BuiltinProblemListId, number>();
@@ -28,11 +29,11 @@ export function BuiltinListsSection(props: {
   readonly selectedLists: readonly BuiltinProblemListId[];
 }): React.ReactElement {
   return (
-    <div className="groups-section">
-      <div className="groups-section__header">
+    <div className="groups-block">
+      <div className="block-head">
         <div>
-          <strong>高频题单一键选择 & 新题自动归组</strong>
-          <p>纯本地静态题单匹配，不发起额外网络请求。可一键批量归组本地已做题，也可开启新题命中自动归组。</p>
+          <b>高频题单一键选择 &amp; 新题自动归组</b>
+          <small>纯本地静态题单匹配，不发起额外网络请求。可一键批量归组本地已做题，也可开启新题命中自动归组。</small>
         </div>
       </div>
       <div className="builtin-list-grid">
@@ -51,7 +52,7 @@ export function BuiltinListsSection(props: {
         ))}
       </div>
       <div className="builtin-list-apply">
-        <select aria-label="一键归组目标分组" disabled={props.busy} onChange={(event) => props.onTargetGroupChange(event.target.value)} value={props.applyTargetGroup}>
+        <select aria-label="一键归组目标分组" className="select" disabled={props.busy} onChange={(event) => props.onTargetGroupChange(event.target.value)} value={props.applyTargetGroup}>
           <option value="">默认分组</option>
           {props.groups.map((group) => (
             <option key={group.id} value={group.id}>{group.name}（{formatPercent(group.requestRetention)}）</option>
@@ -86,16 +87,15 @@ function BuiltinListCard({
 }): React.ReactElement {
   return (
     <div className={`builtin-list-card${checked ? ' is-selected' : ''}`}>
-      <label className="builtin-list-card__check">
-        <input checked={checked} disabled={busy} onChange={onToggle} type="checkbox" />
-        <div>
-          <strong>{list.name}</strong>
-          <span>{list.description} · 本地已命中 {matchedCount} 题</span>
-        </div>
-      </label>
+      <Checkbox ariaLabel={list.name} checked={checked} disabled={busy} onChange={onToggle}>
+        <span className="builtin-list-card__text">
+          <b>{list.name}</b>
+          <small>{list.description} · 本地已命中 {matchedCount} 题</small>
+        </span>
+      </Checkbox>
       <label className="builtin-list-card__auto">
         <span>新题命中自动归入</span>
-        <select aria-label={`${list.name}自动归组`} disabled={busy || groups.length === 0} onChange={(event) => onAutoRuleChange(event.target.value)} value={autoGroupId}>
+        <select aria-label={`${list.name}自动归组`} className="select" disabled={busy || groups.length === 0} onChange={(event) => onAutoRuleChange(event.target.value)} value={autoGroupId}>
           <option value="">不自动归组</option>
           {groups.map((group) => (
             <option key={group.id} value={group.id}>{group.name}（{formatPercent(group.requestRetention)}）</option>
@@ -104,8 +104,4 @@ function BuiltinListCard({
       </label>
     </div>
   );
-}
-
-function formatPercent(value: number): string {
-  return `${Math.round(value * 100)}%`;
 }

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import type { DailySummary, DetectionIssue } from '../../../src/domain/types';
+import type { DailySummary, DetectionIssue, ProblemRecord } from '../../../src/domain/types';
 import { sendExtensionRequest } from '../../../src/shared/messaging';
-import { Button, EmptyState, InlineNotice, PageHeading } from '../../../src/ui/components';
+import { Button, cx, EmptyState, InlineNotice, Pill } from '../../../src/ui/components';
 import { formatDateTime, issueLabel } from '../../../src/ui/format';
 import { Icon } from '../../../src/ui/Icon';
+import './records.css';
 
 type IssueAction = 'issue.mark-read' | 'issue.resolve';
 
@@ -18,16 +19,17 @@ export function IssuesView({
   const sorted = [...summary.issues].sort((left, right) => right.occurredAt - left.occurredAt);
   const activeIssues = sorted.filter((issue) => issue.resolvedAt === null);
   const unreadIssues = sorted.filter((issue) => issue.readAt === null);
+  const problemsBySlug = new Map(summary.problems.map((problem) => [problem.slug, problem]));
   return (
-    <div className="view-content">
-      <IssuesHeading
+    <div className="rec-issues">
+      <IssuesToolbar
         activeIssues={activeIssues}
         busy={busy}
         onAction={updateIssues}
         unreadIssues={unreadIssues}
       />
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      <section className="issues-list">
+      <section aria-label="检测异常列表" className="card rec-issue-list">
         {sorted.length === 0
           ? <EmptyState description="提交检测运行正常，这里暂时没有记录。" icon="check" title="没有检测异常" />
           : sorted.map((issue, index) => (
@@ -36,6 +38,7 @@ export function IssuesView({
                 issue={issue}
                 key={issue.id ?? `${issue.occurredAt}-${index}`}
                 onAction={(action) => void updateIssues(action, [issue])}
+                problem={problemsBySlug.get(issue.slug)}
               />
             ))}
       </section>
@@ -67,7 +70,7 @@ function useIssueActions(refresh: () => Promise<void>): {
   return { busy, error, updateIssues };
 }
 
-function IssuesHeading({
+function IssuesToolbar({
   activeIssues,
   busy,
   onAction,
@@ -79,20 +82,17 @@ function IssuesHeading({
   readonly unreadIssues: readonly DetectionIssue[];
 }): React.ReactElement {
   return (
-    <PageHeading
-      action={(
-        <div className="issue-bulk-actions">
-          <Button disabled={busy !== null || unreadIssues.length === 0} onClick={() => void onAction('issue.mark-read', unreadIssues)}>
-            {busy === 'issue.mark-read' ? '处理中…' : '全部标记已读'}
-          </Button>
-          <Button disabled={busy !== null || activeIssues.length === 0} onClick={() => void onAction('issue.resolve', activeIssues)} tone="primary">
-            {busy === 'issue.resolve' ? '处理中…' : '全部标记已解决'}
-          </Button>
-        </div>
-      )}
-      description={`当力扣登录、网络或内部接口异常时会如实记录。当前 ${activeIssues.length} 条未解决，${unreadIssues.length} 条未读。`}
-      title="检测异常"
-    />
+    <div className="rec-issues-bar">
+      <p className="num">{`当前 ${activeIssues.length} 条未解决，${unreadIssues.length} 条未读。`}</p>
+      <div className="acts">
+        <Button disabled={busy !== null || unreadIssues.length === 0} onClick={() => void onAction('issue.mark-read', unreadIssues)} size="sm">
+          {busy === 'issue.mark-read' ? '处理中…' : '全部标记已读'}
+        </Button>
+        <Button disabled={busy !== null || activeIssues.length === 0} onClick={() => void onAction('issue.resolve', activeIssues)} size="sm" tone="primary">
+          {busy === 'issue.resolve' ? '处理中…' : '全部标记已解决'}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -100,34 +100,37 @@ function IssueItem({
   busy,
   issue,
   onAction,
+  problem,
 }: {
   readonly busy: boolean;
   readonly issue: DetectionIssue;
   readonly onAction: (action: IssueAction) => void;
+  readonly problem: ProblemRecord | undefined;
 }): React.ReactElement {
   const resolved = issue.resolvedAt !== null;
   const unread = issue.readAt === null;
   return (
-    <article className={`issue-item ${resolved ? 'is-resolved' : ''} ${unread ? 'is-unread' : ''}`}>
-      <span className="issue-item__icon"><Icon name={resolved ? 'check' : 'alert'} /></span>
-      <div className="issue-item__main">
-        <IssueStatus issue={issue} />
-        <p>题目：{issue.slug} · {formatDateTime(issue.occurredAt)}</p>
-        <code>{issue.diagnostic}</code>
+    <article className={cx('rec-issue', resolved && 'resolved', unread && 'unread')}>
+      <span className="rec-issue-ic"><Icon name={resolved ? 'check' : 'alert'} /></span>
+      <div className="rec-issue-main">
+        <IssueStatus issue={issue} problem={problem} />
+        <p>{formatDateTime(issue.occurredAt)}</p>
+        <code><span className="rec-issue-code">{issue.code}</span><span>{issue.diagnostic}</span></code>
       </div>
       <IssueActions busy={busy} issue={issue} onAction={onAction} />
     </article>
   );
 }
 
-function IssueStatus({ issue }: { readonly issue: DetectionIssue }): React.ReactElement {
+function IssueStatus({ issue, problem }: { readonly issue: DetectionIssue; readonly problem: ProblemRecord | undefined }): React.ReactElement {
   const resolved = issue.resolvedAt !== null;
   return (
-    <div>
-      <strong>{issueLabel[issue.code]}</strong>
-      <span className={resolved ? 'status-resolved' : 'status-active'}>{resolved ? '已解决' : '未解决'}</span>
-      {issue.readAt === null && <span className="status-unread">未读</span>}
-      {issue.retryable && !resolved && <span className="status-retry">可重试</span>}
+    <div className="rec-issue-head">
+      <b>{issueLabel[issue.code]}</b>
+      <span className="rec-issue-problem">· {problem ? `${problem.frontendId}. ${problem.title}` : issue.slug}</span>
+      <Pill tone={resolved ? 'good' : 'danger'}>{resolved ? '已解决' : '未解决'}</Pill>
+      {issue.readAt === null && <Pill tone="brand">未读</Pill>}
+      {issue.retryable && !resolved && <Pill>可重试</Pill>}
     </div>
   );
 }
@@ -143,9 +146,9 @@ function IssueActions({
 }): React.ReactElement | null {
   if (issue.resolvedAt !== null) return null;
   return (
-    <div className="issue-item__actions">
-      {issue.readAt === null && <Button disabled={busy} onClick={() => onAction('issue.mark-read')}>标记已读</Button>}
-      <Button disabled={busy} onClick={() => onAction('issue.resolve')} tone="primary">标记已解决</Button>
+    <div className="rec-issue-acts">
+      {issue.readAt === null && <Button disabled={busy} onClick={() => onAction('issue.mark-read')} size="sm" tone="ghost">标记已读</Button>}
+      <Button disabled={busy} onClick={() => onAction('issue.resolve')} size="sm">标记已解决</Button>
     </div>
   );
 }
