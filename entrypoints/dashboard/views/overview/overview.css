@@ -59,7 +59,7 @@
 
 /* 今日队列 */
 .ov-queue-aside { display: inline-flex; align-items: center; gap: 8px; }
-.ov-queue-aside .select { height: 30px; font-size: 12px; }
+.ov-queue-aside .select-trigger { font-size: 12px; }
 .ov-queue-note { padding: 10px 18px 0; }
 .ov-queue-body { padding: 8px 6px 6px; }
 .ov-table-wrap { overflow-x: auto; }

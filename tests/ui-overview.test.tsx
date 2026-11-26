@@ -97,7 +97,8 @@ describe('面板 · 概览', () => {
     fireEvent.click(screen.getByRole('button', { name: '展开其余 1 题' }));
     expect(within(screen.getByRole('table', { name: '积压题目' })).getByText('42. 接雨水')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('队列排序策略'), { target: { value: 'priority' } });
+    fireEvent.click(screen.getByRole('combobox', { name: '队列排序策略' }));
+    fireEvent.click(screen.getByRole('option', { name: /智能优先/ }));
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'settings.update', payload: { queueSortStrategy: 'priority' } }));
     await waitFor(() => expect(refresh).toHaveBeenCalled());
   });

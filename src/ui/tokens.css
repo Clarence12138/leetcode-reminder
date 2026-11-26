@@ -16,11 +16,12 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-/* 评分四色、难度色、逾期色：已过色盲可分辨性校验，不要随意改 */
+/* 评分四色、难度色、状态色、逾期色：已过色盲可分辨性校验，不要随意改 */
 [data-mode="light"] {
   color-scheme: light;
   --warn: #b54708;
-  --again: #dc3f5a; --hard: #c08b00; --good: #1b8c5a; --easy: #2f6fd0;
+  --success: #1b8c5a; --on-success: #fff; --info: #2f6fd0;
+  --again: #dc3f5a; --hard: #c08b00; --good: #2f6fd0; --easy: #1b8c5a;
   /* 评分色块上的文字色 */
   --on-again: #fff; --on-hard: #1d1500; --on-good: #fff; --on-easy: #fff;
   --d-easy: #14804a; --d-med: #a8620a; --d-hard: #c8323f;
@@ -34,8 +35,9 @@
 [data-mode="dark"] {
   color-scheme: dark;
   --warn: #f0a35e;
-  --again: #e0546a; --hard: #be8a10; --good: #2ea56f; --easy: #5a8cf0;
-  --on-again: #160a0c; --on-hard: #140f00; --on-good: #06140e; --on-easy: #0a1224;
+  --success: #2ea56f; --on-success: #06140e; --info: #5a8cf0;
+  --again: #e0546a; --hard: #be8a10; --good: #5a8cf0; --easy: #2ea56f;
+  --on-again: #160a0c; --on-hard: #140f00; --on-good: #0a1224; --on-easy: #06140e;
   --d-easy: #4cc38a; --d-med: #e5a54b; --d-hard: #f07a86;
   --shadow-card: none;
   --shadow-pop: 0 18px 50px rgba(0, 0, 0, .5);

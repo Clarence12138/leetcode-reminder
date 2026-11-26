@@ -5,7 +5,7 @@ import {
   type BuiltinProblemListId,
 } from '../../../src/domain/problem-lists';
 import type { AutoGroupRule, DailySummary, ReviewGroup } from '../../../src/domain/types';
-import { Button, Checkbox } from '../../../src/ui/components';
+import { Button, Checkbox, Select, type SelectOption } from '../../../src/ui/components';
 import { formatPercent } from './settings/RetentionStepper';
 
 export function countProblemsByList(problems: DailySummary['problems']): Map<BuiltinProblemListId, number> {
@@ -52,18 +52,26 @@ export function BuiltinListsSection(props: {
         ))}
       </div>
       <div className="builtin-list-apply">
-        <select aria-label="一键归组目标分组" className="select" disabled={props.busy} onChange={(event) => props.onTargetGroupChange(event.target.value)} value={props.applyTargetGroup}>
-          <option value="">默认分组</option>
-          {props.groups.map((group) => (
-            <option key={group.id} value={group.id}>{group.name}（{formatPercent(group.requestRetention)}）</option>
-          ))}
-        </select>
+        <Select
+          ariaLabel="一键归组目标分组"
+          disabled={props.busy}
+          onChange={props.onTargetGroupChange}
+          options={groupSelectOptions('默认分组', props.groups)}
+          value={props.applyTargetGroup}
+        />
         <Button disabled={props.busy || props.selectedLists.length === 0} icon="layers" onClick={props.onApply} tone="primary">
           一键归组所选题单命中题目
         </Button>
       </div>
     </div>
   );
+}
+
+function groupSelectOptions(emptyLabel: string, groups: readonly ReviewGroup[]): readonly SelectOption[] {
+  return [
+    { value: '', label: emptyLabel },
+    ...groups.map((group) => ({ value: group.id, label: group.name, hint: formatPercent(group.requestRetention) })),
+  ];
 }
 
 function BuiltinListCard({
@@ -93,15 +101,18 @@ function BuiltinListCard({
           <small>{list.description} · 本地已命中 {matchedCount} 题</small>
         </span>
       </Checkbox>
-      <label className="builtin-list-card__auto">
+      <div className="builtin-list-card__auto">
         <span>新题命中自动归入</span>
-        <select aria-label={`${list.name}自动归组`} className="select" disabled={busy || groups.length === 0} onChange={(event) => onAutoRuleChange(event.target.value)} value={autoGroupId}>
-          <option value="">不自动归组</option>
-          {groups.map((group) => (
-            <option key={group.id} value={group.id}>{group.name}（{formatPercent(group.requestRetention)}）</option>
-          ))}
-        </select>
-      </label>
+        <Select
+          align="right"
+          ariaLabel={`${list.name}自动归组`}
+          disabled={busy || groups.length === 0}
+          onChange={onAutoRuleChange}
+          options={groupSelectOptions('不自动归组', groups)}
+          size="sm"
+          value={autoGroupId}
+        />
+      </div>
     </div>
   );
 }

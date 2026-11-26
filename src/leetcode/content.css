@@ -84,10 +84,10 @@
   place-items: center;
   border-radius: 50%;
   color: #fff;
-  background: var(--good);
+  background: var(--success);
   animation: xsj-pop .35s var(--spring);
 }
-.xsj-ok--good { color: var(--on-good); }
+.xsj-ok--good { color: var(--on-success); }
 .xsj-ok--danger { color: var(--on-again); background: var(--again); }
 .xsj-ok--muted { color: var(--ink-2); background: var(--surface-3); }
 
@@ -243,7 +243,7 @@
 .xsj-next small { color: var(--muted); font-size: 12px; }
 .xsj-next b { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font-weight: 600; }
 .xsj-next p { margin: 0; }
-.xsj-next--done { display: flex; justify-content: center; gap: 8px; color: var(--good); font-weight: 600; }
+.xsj-next--done { display: flex; justify-content: center; gap: 8px; color: var(--success); font-weight: 600; }
 
 /* 按钮：悬停只变色，按下缩到 97% */
 .xsj-btn {

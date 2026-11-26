@@ -129,7 +129,8 @@ describe('面板 · 设置', () => {
 
   it('队列排序与默认保持率即时保存', async () => {
     renderView();
-    fireEvent.change(screen.getByLabelText('默认队列排序策略'), { target: { value: 'priority' } });
+    fireEvent.click(screen.getByRole('combobox', { name: '默认队列排序策略' }));
+    fireEvent.click(screen.getByRole('option', { name: /智能优先/ }));
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
       type: 'settings.update',
       payload: { queueSortStrategy: 'priority' },
@@ -172,8 +173,15 @@ describe('面板 · 设置', () => {
     }));
     expect(await screen.findByText(/已匹配本地 1 道题/)).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('新分组名称'), { target: { value: '冲刺' } });
-    fireEvent.click(screen.getByRole('button', { name: '新建分组' }));
+    const nameInput = screen.getByLabelText('新分组名称');
+    const createBtn = screen.getByRole('button', { name: '新建分组' });
+    expect(createBtn).toBeEnabled();
+    fireEvent.click(createBtn);
+    expect(nameInput).toHaveFocus();
+    expect(await screen.findByText('请输入分组名称')).toBeInTheDocument();
+
+    fireEvent.change(nameInput, { target: { value: '冲刺' } });
+    fireEvent.click(createBtn);
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
       type: 'settings.update',
       payload: { reviewGroups: [...groupedSettings.reviewGroups, { id: '冲刺', name: '冲刺', requestRetention: 0.9 }] },

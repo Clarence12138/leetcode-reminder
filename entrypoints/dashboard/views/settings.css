@@ -23,7 +23,7 @@
 .timef { width: 110px; }
 .quota-controls { display: flex; align-items: center; gap: 8px; }
 .quota-input { width: 88px; height: 32px; }
-.srow .select { max-width: 260px; }
+.srow .select-trigger { max-width: 260px; }
 
 /* 外观 */
 .ap-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; align-items: start; padding: 4px 0 14px; }
@@ -69,8 +69,28 @@
 .grow b { font-weight: 600; }
 .grow small { display: block; color: var(--muted); font-size: 12px; }
 .grow .cnt { color: var(--muted); font-size: 12px; text-align: right; }
-.group-create { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 0 6px; border-top: 1px solid var(--line-2); }
-.group-create .field { width: 240px; max-width: 100%; }
+.group-create {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 6px;
+  padding: 12px 14px;
+  border: 1px dashed color-mix(in srgb, var(--brand) 32%, var(--line-strong));
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--brand-50) 45%, var(--surface-2));
+  transition: border-color .15s, background-color .15s;
+}
+.group-create:focus-within {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--brand) 60%, var(--line-strong));
+  background: color-mix(in srgb, var(--brand-50) 68%, var(--surface-2));
+}
+.group-create__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.group-create__head b { color: var(--ink); font-size: 13px; font-weight: 600; }
+.group-create__head small { color: var(--muted); font-size: 12px; }
+.group-create__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.group-create .field { flex: 1 1 220px; max-width: 300px; }
+.group-create .stepper { height: 36px; }
+.group-create .stepper button { height: 34px; }
 .builtin-list-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; padding: 4px 0 10px; }
 .builtin-list-card { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); transition: border-color .12s, background-color .12s; }
 .builtin-list-card.is-selected { border-color: var(--brand); background: var(--brand-50); }
@@ -78,7 +98,9 @@
 .builtin-list-card__text b { font-size: 13px; font-weight: 600; }
 .builtin-list-card__text small { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .builtin-list-card__auto { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
-.builtin-list-card__auto .select { min-width: 0; max-width: 170px; height: 30px; }
+.builtin-list-card__auto .select-trigger { min-width: 0; max-width: 176px; }
+.builtin-list-card.is-selected .select-trigger { background: var(--surface); }
+.builtin-list-card.is-selected .select-trigger:hover:not(:disabled) { background: var(--surface-2); }
 .builtin-list-apply { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 4px 0 12px; }
 
 /* 导入 / 数据 / 危险操作 */

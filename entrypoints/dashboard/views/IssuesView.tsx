@@ -128,7 +128,7 @@ function IssueStatus({ issue, problem }: { readonly issue: DetectionIssue; reado
     <div className="rec-issue-head">
       <b>{issueLabel[issue.code]}</b>
       <span className="rec-issue-problem">· {problem ? `${problem.frontendId}. ${problem.title}` : issue.slug}</span>
-      <Pill tone={resolved ? 'good' : 'danger'}>{resolved ? '已解决' : '未解决'}</Pill>
+      <Pill tone={resolved ? 'success' : 'danger'}>{resolved ? '已解决' : '未解决'}</Pill>
       {issue.readAt === null && <Pill tone="brand">未读</Pill>}
       {issue.retryable && !resolved && <Pill>可重试</Pill>}
     </div>

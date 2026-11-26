@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { BuiltinProblemListId } from '../../../src/domain/problem-lists';
 import type { AutoGroupRule, DailySummary, ReviewGroup, Settings } from '../../../src/domain/types';
 import { sendExtensionRequest } from '../../../src/shared/messaging';
@@ -242,13 +242,34 @@ function GroupCreateForm({ busy, groupName, groupRetention, onAdd, onNameChange,
   readonly onNameChange: (value: string) => void;
   readonly onRetentionChange: (value: number) => void;
 }): React.ReactElement {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const submit = (): void => {
+    if (!groupName.trim()) inputRef.current?.focus();
+    onAdd();
+  };
   return (
     <div className="group-create">
-      <label className="field">
-        <input aria-label="新分组名称" disabled={busy} maxLength={32} onChange={(event) => onNameChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && groupName.trim()) onAdd(); }} placeholder="如：大厂高频、冲刺核心" type="text" value={groupName} />
-      </label>
-      <Stepper disabled={busy} format={formatPercent} label="新分组目标保持率" max={RETENTION_MAX} min={RETENTION_MIN} onChange={onRetentionChange} step={0.01} value={groupRetention} />
-      <Button disabled={busy || !groupName.trim()} icon="plus" onClick={onAdd} size="sm" tone="primary">新建分组</Button>
+      <div className="group-create__head">
+        <b>新建自定义分组</b>
+        <small>输入名称并设定目标保持率</small>
+      </div>
+      <div className="group-create__row">
+        <label className="field">
+          <input
+            aria-label="新分组名称"
+            disabled={busy}
+            maxLength={32}
+            onChange={(event) => onNameChange(event.target.value)}
+            onKeyDown={(event) => { if (event.key === 'Enter') submit(); }}
+            placeholder="输入分组名称，如：大厂高频、冲刺核心"
+            ref={inputRef}
+            type="text"
+            value={groupName}
+          />
+        </label>
+        <Stepper disabled={busy} format={formatPercent} label="新分组目标保持率" max={RETENTION_MAX} min={RETENTION_MIN} onChange={onRetentionChange} step={0.01} value={groupRetention} />
+        <Button disabled={busy} icon="plus" onClick={submit} tone="primary">新建分组</Button>
+      </div>
     </div>
   );
 }

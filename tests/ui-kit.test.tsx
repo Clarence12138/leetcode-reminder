@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReviewPreview } from '../src/domain/types';
-import { Button, ChipMenu, Segmented, Switch, ToastProvider, useToast } from '../src/ui/components';
+import { Button, ChipMenu, Segmented, Select, Switch, ToastProvider, useToast } from '../src/ui/components';
 import { RatingButtons } from '../src/ui/rating';
 import {
   APPEARANCE_CACHE_KEY,
@@ -297,6 +297,48 @@ describe('通用控件', () => {
     fireEvent.click(screen.getByRole('menuitemradio', { name: '最早添加' }));
     expect(onChange).toHaveBeenCalledWith(['old']);
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('自定义下拉框：支持点击选择、键盘导航与外部关闭', () => {
+    function Demo() {
+      const [value, setValue] = useState<'none' | 'hot' | 'sprint'>('none');
+      return (
+        <>
+          <Select
+            ariaLabel="目标分组"
+            onChange={setValue}
+            options={[
+              { value: 'none', label: '不自动归组' },
+              { value: 'hot', label: '高频核心', hint: '90%' },
+              { value: 'sprint', label: '冲刺核心', hint: '95%' },
+            ]}
+            value={value}
+          />
+          <output>{value}</output>
+          <p>外部空白</p>
+        </>
+      );
+    }
+    render(<Demo />);
+    const trigger = screen.getByRole('combobox', { name: '目标分组' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('option', { name: '不自动归组' })).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(screen.getByRole('option', { name: /高频核心/ }));
+    expect(screen.getByRole('status')).toHaveTextContent('hot');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    expect(screen.getByRole('status')).toHaveTextContent('sprint');
+
+    fireEvent.click(trigger);
+    fireEvent.mouseDown(screen.getByText('外部空白'));
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 });
 

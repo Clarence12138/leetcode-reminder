@@ -4,7 +4,7 @@ import type { HistoryImportResult, HistoryRatingMode, MasteryRating } from '../.
 import type { HistoryFetchResult } from '../../../src/leetcode/history-fetcher';
 import type { HistoryImportState } from '../../../src/shared/history-import-state';
 import { sendExtensionRequest } from '../../../src/shared/messaging';
-import { Button, InlineNotice, Segmented } from '../../../src/ui/components';
+import { Button, InlineNotice, Segmented, Select, type SelectOption } from '../../../src/ui/components';
 import { ratingLabel } from '../../../src/ui/format';
 import { HistoryImportContext } from '../useHistoryImport';
 import { SettingRow } from './settings/parts';
@@ -14,6 +14,11 @@ const RATINGS: readonly MasteryRating[] = ['AGAIN', 'HARD', 'GOOD', 'EASY'];
 type Mode = HistoryRatingMode['mode'];
 type HistoryJobRequest = Extract<ExtensionRequest, { readonly type: 'history.start' | 'history.cancel' }>;
 interface Notice { readonly text: string; readonly tone: 'error' | 'success' | 'info' }
+
+const MODE_OPTIONS: readonly SelectOption<Mode>[] = [
+  { value: 'uniform', label: '统一评为' },
+  { value: 'manual', label: '导入后自己补评' },
+];
 
 export function LeetCodeImportPanel(): React.ReactElement {
   const [mode, setMode] = useState<Mode>('uniform');
@@ -37,10 +42,7 @@ export function LeetCodeImportPanel(): React.ReactElement {
       <p className="sec-desc">读取你在力扣中文站已通过的题目和 AC 记录，导入本地还没有的题目；本地已有的题目保持不变。需要先在本浏览器登录 leetcode.cn。导入时会临时打开一个力扣后台标签页并逐个请求，题目较多时需要几分钟，导入在后台进行，可以切换页面或关闭面板，完成后自动关闭临时标签页。</p>
       <SettingRow description={modeDescription(mode)} label="评分方式">
         <div className="import-actions">
-          <select aria-label="导入评分方式" className="select" disabled={running} onChange={(event) => setMode(event.target.value as Mode)} value={mode}>
-            <option value="uniform">统一评为</option>
-            <option value="manual">导入后自己补评</option>
-          </select>
+          <Select ariaLabel="导入评分方式" disabled={running} onChange={setMode} options={MODE_OPTIONS} value={mode} />
           {mode === 'uniform' && (
             <Segmented
               ariaLabel="统一评分档位"

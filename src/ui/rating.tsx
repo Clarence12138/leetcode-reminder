@@ -242,6 +242,6 @@ function shortcutRating(event: KeyboardEvent): MasteryRating | null {
 /** 焦点在输入框、下拉框或可编辑区域（如代码编辑器）里时，不响应评分快捷键。 */
 export function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
-  if (target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"]')) return true;
+  if (target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"], [role="combobox"], [role="listbox"]')) return true;
   return target instanceof HTMLElement && target.isContentEditable;
 }

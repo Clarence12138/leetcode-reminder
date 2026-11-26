@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ProblemRecord, QueueSortStrategy, Settings } from '../../../../src/domain/types';
 import { sendExtensionRequest } from '../../../../src/shared/messaging';
-import { buttonClassName, Card, DifficultyBadge, EmptyState, InlineNotice } from '../../../../src/ui/components';
+import { buttonClassName, Card, DifficultyBadge, EmptyState, InlineNotice, Select } from '../../../../src/ui/components';
 import { formatInterval, formatDue, ratingLabel } from '../../../../src/ui/format';
 import type { OverviewModel } from './overview-model';
 import { problemLabel, reviewUrl } from './overview-model';
@@ -26,15 +26,15 @@ export function QueueCard({ model, refresh, settings }: {
   const title = progress.limit === null ? '今日队列' : `今日队列 · ${todayProblems.length}`;
   const aside = (
     <span className="ov-queue-aside">
-      <select
-        aria-label="队列排序策略"
-        className="select"
+      <Select
+        align="right"
+        ariaLabel="队列排序策略"
         disabled={sort.saving}
-        onChange={(event) => void sort.update(event.target.value as QueueSortStrategy)}
+        onChange={(next) => void sort.update(next)}
+        options={SORT_OPTIONS}
+        size="sm"
         value={settings.queueSortStrategy}
-      >
-        {SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
+      />
     </span>
   );
   return (

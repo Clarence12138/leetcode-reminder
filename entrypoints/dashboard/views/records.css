@@ -41,7 +41,7 @@
 .rec-iv { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .rec-iv b { color: var(--ink); font-weight: 600; }
 .rec-trend { font-weight: 700; }
-.rec-trend.up { color: var(--good); }
+.rec-trend.up { color: var(--success); }
 .rec-trend.down { color: var(--again); }
 .rec-trend.same { color: var(--muted); }
 
@@ -85,7 +85,7 @@
 .rec-issue + .rec-issue { border-top: 1px solid var(--line-2); }
 .rec-issue.unread { box-shadow: inset 3px 0 0 var(--brand); }
 .rec-issue-ic { display: grid; width: 32px; height: 32px; place-items: center; border-radius: var(--r-md); color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); }
-.rec-issue.resolved .rec-issue-ic { color: var(--good); background: color-mix(in srgb, var(--good) 12%, var(--surface)); }
+.rec-issue.resolved .rec-issue-ic { color: var(--success); background: color-mix(in srgb, var(--success) 12%, var(--surface)); }
 .rec-issue.resolved .rec-issue-main { opacity: .72; }
 .rec-issue-main { min-width: 0; }
 .rec-issue-head { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 6px; }

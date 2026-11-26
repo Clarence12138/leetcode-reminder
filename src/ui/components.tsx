@@ -7,6 +7,7 @@ import { Icon, type IconName } from './Icon';
 export { cx } from './cx';
 export { Checkbox, Segmented, Stepper, Switch, type SegmentedOption } from './controls';
 export { Chip, ChipMenu, type ChipMenuOption } from './chip-menu';
+export { Select, type SelectOption, type SelectProps } from './select';
 export { ToastProvider, useToast, type ToastApi, type ToastOptions } from './toast';
 
 export function Brand({ compact = false }: { readonly compact?: boolean }): React.ReactElement {
@@ -98,7 +99,7 @@ export function DifficultyBadge({ difficulty }: { readonly difficulty: Difficult
   return <span className={`diff ${difficulty.toLowerCase()}`}>{difficultyLabel[difficulty]}</span>;
 }
 
-export type PillTone = 'default' | 'brand' | 'group' | 'paused' | 'pending' | 'danger' | 'again' | 'hard' | 'good' | 'easy';
+export type PillTone = 'default' | 'brand' | 'group' | 'paused' | 'pending' | 'danger' | 'success' | 'again' | 'hard' | 'good' | 'easy';
 
 export function Pill({ children, className, tone = 'default' }: PropsWithChildren<{ readonly className?: string; readonly tone?: PillTone }>): React.ReactElement {
   return <span className={cx('pill', tone !== 'default' && tone, className)}>{children}</span>;

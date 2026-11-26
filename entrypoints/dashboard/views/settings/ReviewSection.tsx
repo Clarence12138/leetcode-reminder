@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { QueueSortStrategy, Settings } from '../../../../src/domain/types';
-import { InlineNotice, Segmented, Switch } from '../../../../src/ui/components';
+import { InlineNotice, Segmented, Select, Switch } from '../../../../src/ui/components';
 import { RetentionStepper } from './RetentionStepper';
 import { SettingRow, Section } from './parts';
 import { useDraft, useSettingsSaver } from './use-saver';
@@ -39,9 +39,14 @@ export function ReviewSection({ refresh, settings }: { readonly refresh: () => P
     <Section description="控制每天的量、顺序和保持率。" id="settings-review" title="复习">
       <DailyLimitRow limit={settings.dailyReviewLimit} onError={setError} onSave={save} saving={saving} />
       <SettingRow description="默认按最早到期排序；积压较多时可切换为智能优先，先复习高频分组、薄弱题和近期新题。" label="队列排序策略">
-        <select aria-label="默认队列排序策略" className="select" disabled={saving} onChange={(event) => void changeSort(event.target.value as QueueSortStrategy)} value={sort}>
-          {SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
+        <Select
+          align="right"
+          ariaLabel="默认队列排序策略"
+          disabled={saving}
+          onChange={(next) => void changeSort(next)}
+          options={SORT_OPTIONS}
+          value={sort}
+        />
       </SettingRow>
       <SettingRow description="保持率越高复习越频繁、负担越重；分组可以单独设置。" label="默认目标保持率">
         <RetentionStepper
