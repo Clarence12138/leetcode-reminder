@@ -61,6 +61,29 @@ export function formatDue(timestamp: number | null, now = Date.now()): string {
   return `${days} 天后复习`;
 }
 
+/** 从 now 所在的本地日期到 timestamp 所在日期相差的天数（按日历日，不按 24 小时）。 */
+export function calendarDaysBetween(timestamp: number, now = Date.now()): number {
+  return Math.round((startOfDay(timestamp) - startOfDay(now)) / DAY_MS);
+}
+
+/** 间隔天数的简短写法：今天 / 明天 / 9 天 / 3 个月 / 1.5 年。 */
+export function formatInterval(days: number): string {
+  if (days <= 0) return '今天';
+  if (days === 1) return '明天';
+  if (days < 60) return `${days} 天`;
+  if (days < 365) return `${Math.round(days / 30)} 个月`;
+  return `${(Math.round((days / 365) * 10) / 10).toString()} 年`;
+}
+
+/** “明天复习 / 9 天后复习 / 今天复习”，用于评分后的提示。 */
+export function formatNextReviewIn(timestamp: number | null, now = Date.now()): string {
+  if (timestamp === null) return '暂无排期';
+  const days = calendarDaysBetween(timestamp, now);
+  if (days <= 0) return '今天复习';
+  if (days === 1) return '明天复习';
+  return `${formatInterval(days)}后复习`;
+}
+
 export function problemName(problem: ProblemRecord | undefined, review: SubmissionReview): string {
   if (!problem) return review.problemId;
   return `${problem.frontendId}. ${problem.title}`;

@@ -1,0 +1,51 @@
+/*
+ * 设计令牌：语义色（只随浅/深变化，不随主题色变化）+ 圆角、缓动等。
+ * 主题色变量（--bg --surface --ink --brand --s0…--s5 等）由 src/ui/theme/palettes.ts 生成并注入。
+ * 扩展页把 data-theme / data-mode 设在 <html> 上；页内卡设在自己的根节点上。
+ */
+
+:root,
+:host,
+[data-mode] {
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --spring: cubic-bezier(.34, 1.56, .64, 1);
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* 评分四色、难度色、逾期色：已过色盲可分辨性校验，不要随意改 */
+[data-mode="light"] {
+  color-scheme: light;
+  --warn: #b54708;
+  --again: #dc3f5a; --hard: #c08b00; --good: #1b8c5a; --easy: #2f6fd0;
+  /* 评分色块上的文字色 */
+  --on-again: #fff; --on-hard: #1d1500; --on-good: #fff; --on-easy: #fff;
+  --d-easy: #14804a; --d-med: #a8620a; --d-hard: #c8323f;
+  --shadow-card: 0 1px 2px rgba(16, 24, 20, .04);
+  --shadow-pop: 0 18px 50px rgba(15, 25, 35, .18);
+  --tip-bg: #1b2320; --tip-ink: #fff;
+  --toast-bg: #1b2320; --toast-ink: #f2f5f3;
+  --scrim: rgba(15, 22, 19, .42);
+}
+
+[data-mode="dark"] {
+  color-scheme: dark;
+  --warn: #f0a35e;
+  --again: #e0546a; --hard: #be8a10; --good: #2ea56f; --easy: #5a8cf0;
+  --on-again: #160a0c; --on-hard: #140f00; --on-good: #06140e; --on-easy: #0a1224;
+  --d-easy: #4cc38a; --d-med: #e5a54b; --d-hard: #f07a86;
+  --shadow-card: none;
+  --shadow-pop: 0 18px 50px rgba(0, 0, 0, .5);
+  --tip-bg: #eef1ef; --tip-ink: #111;
+  --toast-bg: #eef1ef; --toast-ink: #121614;
+  --scrim: rgba(0, 0, 0, .55);
+}
+
+/* 脚本套上外观之前的兜底（松绿），减少首屏闪色 */
+:root:not([data-mode]) { --bg: oklch(0.972 0.006 163); --ink: oklch(0.2 0.012 163); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode]) { color-scheme: dark; --bg: oklch(0.165 0.0078 163); --ink: oklch(0.94 0.0062 163); }
+}
