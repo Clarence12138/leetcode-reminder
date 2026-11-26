@@ -140,7 +140,12 @@ describe('ContentController', () => {
     });
     expect(notices.at(-1)).toEqual({
       kind: 'discarded',
-      title: '两数之和',
+      problem: {
+        problemId: 'leetcode-cn:two-sum',
+        frontendId: '1',
+        title: '两数之和',
+        difficulty: 'EASY',
+      },
     });
   });
   describe('页内卡新增流程', () => {

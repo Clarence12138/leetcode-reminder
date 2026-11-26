@@ -55,7 +55,7 @@ export type ContentNotice =
     }
   | {
       readonly kind: 'discarded';
-      readonly title: string;
+      readonly problem: NoticeProblem;
     }
   | {
       readonly kind: 'error';
@@ -180,14 +180,14 @@ export class ContentController {
 
   async discard(): Promise<void> {
     if (this.notice.kind !== 'rating') return;
-    const title = this.notice.title;
+    const { problem } = this.notice;
     const ticket = this.epoch;
     await sendExtensionRequest({
       type: 'submission.discard',
       payload: { submissionId: this.notice.review.submissionId },
     });
     if (ticket !== this.epoch) return;
-    this.transition({ kind: 'discarded', title });
+    this.transition({ kind: 'discarded', problem });
   }
 
   dismiss(): void {

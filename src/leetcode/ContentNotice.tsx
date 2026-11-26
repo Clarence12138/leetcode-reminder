@@ -73,9 +73,14 @@ function NoticeBody({ controller, notice }: { readonly controller: ContentContro
     case 'discarded':
       return (
         <Card className="xsj-card--plain" label="未记录本次提交" role="status">
-          <CardHead icon="minus" onClose={() => controller.dismiss()} title="未记录本次提交" tone="muted" />
-          <p className="xsj-text">{notice.title}</p>
-          <p className="xsj-muted">这条 Accepted 不会进入待评估，也不会改动现有复习计划。</p>
+          <CardHead
+            icon="minus"
+            onClose={() => controller.dismiss()}
+            subtitle={<ProblemName problem={notice.problem} />}
+            title="未记录本次提交"
+            tone="muted"
+          />
+          <p className="xsj-muted xsj-pad">这条 Accepted 不会进入待评估，也不会改动现有复习计划。</p>
         </Card>
       );
     case 'rating':
