@@ -7,7 +7,9 @@ import type {
   HistoryRatingMode,
   LeetCodeHistoryProblem,
   MasteryRating,
+  NextReview,
   ProblemMetadata,
+  ReviewContext,
   ReviewPreview,
   Settings,
   SubmissionReview,
@@ -37,6 +39,27 @@ export type ExtensionRequest =
       readonly type: 'submission.discard';
       readonly payload: {
         readonly submissionId: string;
+      };
+    }
+  | {
+      /** 撤销评分：把已评分提交恢复为待评估，并重算排期。 */
+      readonly type: 'submission.unrate';
+      readonly payload: {
+        readonly submissionId: string;
+        /** 本次要撤销的评分；与当前评分不一致时拒绝（已在别处改过）。 */
+        readonly rating?: MasteryRating;
+      };
+    }
+  | {
+      readonly type: 'review.next';
+      readonly payload?: {
+        readonly excludeProblemId?: string;
+      };
+    }
+  | {
+      readonly type: 'review.context';
+      readonly payload: {
+        readonly problemId: string;
       };
     }
   | {
@@ -119,12 +142,16 @@ export type TypedResponse<T extends ExtensionRequest['type']> =
         readonly review: SubmissionReview;
         readonly nextReviewAt: number | null;
       }
-    : T extends 'submission.rate'
+    : T extends 'submission.rate' | 'submission.unrate'
       ? { readonly review: SubmissionReview; readonly nextReviewAt: number | null }
       : T extends 'submission.discard'
         ? { readonly problemDeleted: boolean }
       : T extends 'review.preview'
         ? ReviewPreview
+      : T extends 'review.next'
+        ? NextReview
+      : T extends 'review.context'
+        ? ReviewContext
       : T extends 'dashboard.query'
         ? DailySummary
         : T extends 'settings.get' | 'settings.update'

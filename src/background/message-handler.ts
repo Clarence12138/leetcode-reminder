@@ -23,6 +23,8 @@ const READ_ONLY_REQUESTS: ReadonlySet<ExtensionRequest['type']> = new Set([
   'history.start',
   'history.cancel',
   'review.preview',
+  'review.next',
+  'review.context',
   'dashboard.query',
   'settings.get',
   'settings.update',
@@ -65,41 +67,76 @@ async function dispatchRequest(
         request.payload.submissionId,
         request.payload.rating,
       );
-      await services.reminders.refreshBadge();
+      await refreshBadgeQuietly(services);
       return result;
     }
     case 'submission.discard': {
       const result = await services.store.discardSubmission(request.payload.submissionId);
-      await services.reminders.refreshBadge();
+      await refreshBadgeQuietly(services);
       return result;
     }
-    case 'review.preview':
-      return services.store.preview(request.payload.problemId, request.payload.submissionId);
-    case 'dashboard.query':
-      return services.store.queryDashboard(toDashboardFilter(request.payload));
     case 'settings.get':
       return services.settings.get();
     case 'settings.update':
       return handleSettingsUpdate(request.payload, services);
     default:
-      return dispatchMaintenanceRequest(request, services);
+      return dispatchReviewRequest(request, services);
   }
 }
 
+type ReviewRequest = Extract<
+  ExtensionRequest,
+  { readonly type: 'submission.unrate' | 'review.preview' | 'review.next' | 'review.context' | 'dashboard.query' }
+>;
+
+function isReviewRequest(request: ExtensionRequest): request is ReviewRequest {
+  return REVIEW_REQUEST_TYPES.has(request.type);
+}
+
+const REVIEW_REQUEST_TYPES: ReadonlySet<ExtensionRequest['type']> = new Set([
+  'submission.unrate',
+  'review.preview',
+  'review.next',
+  'review.context',
+  'dashboard.query',
+]);
+
+async function dispatchReviewRequest(
+  request: Exclude<ExtensionRequest, { readonly type: HandledFirst }>,
+  services: BackgroundServices,
+): Promise<unknown> {
+  if (!isReviewRequest(request)) return dispatchMaintenanceRequest(request, services);
+  switch (request.type) {
+    case 'submission.unrate': {
+      const result = await services.store.clearRating(request.payload.submissionId, request.payload.rating);
+      await refreshBadgeQuietly(services);
+      return result;
+    }
+    case 'review.preview':
+      return services.store.preview(request.payload.problemId, request.payload.submissionId);
+    case 'review.next':
+      return services.store.nextReview(await services.settings.get(), request.payload?.excludeProblemId);
+    case 'review.context':
+      return services.store.reviewContext(request.payload.problemId);
+    case 'dashboard.query':
+      return services.store.queryDashboard(toDashboardFilter(request.payload));
+    default:
+      return assertNever(request);
+  }
+}
+
+type HandledFirst =
+  | 'history.start'
+  | 'history.cancel'
+  | 'submission.accepted'
+  | 'submission.rate'
+  | 'submission.discard'
+  | 'settings.get'
+  | 'settings.update';
+
 type MaintenanceRequest = Exclude<
   ExtensionRequest,
-  {
-    readonly type:
-      | 'history.start'
-      | 'history.cancel'
-      | 'submission.accepted'
-      | 'submission.rate'
-      | 'submission.discard'
-      | 'review.preview'
-      | 'dashboard.query'
-      | 'settings.get'
-      | 'settings.update';
-  }
+  { readonly type: HandledFirst | ReviewRequest['type'] }
 >;
 
 async function dispatchMaintenanceRequest(
@@ -122,7 +159,7 @@ async function dispatchMaintenanceRequest(
         settings,
         now: Date.now(),
       });
-      await services.reminders.refreshBadge().catch((error: unknown) => console.error('[小刷记] 刷新徽标失败', error));
+      await refreshBadgeQuietly(services);
       return result;
     }
     case 'issue.record':
@@ -182,7 +219,25 @@ async function dispatchProblemMutationRequest(
   return result;
 }
 
-async function handleSettingsUpdate(
+/** 主数据已写入成功，徽标刷新失败只记录，不让本次请求失败。 */
+async function refreshBadgeQuietly(services: BackgroundServices): Promise<void> {
+  try {
+    await services.reminders.refreshBadge();
+  } catch (error) {
+    console.error('[小刷记] 刷新徽标失败', error);
+  }
+}
+
+/** settings.update 是读-合并-写，串行执行避免并发时后写覆盖先写；失败不会卡住后续请求。 */
+let settingsQueue: Promise<unknown> = Promise.resolve();
+
+function handleSettingsUpdate(patch: Partial<Settings>, services: BackgroundServices): Promise<Settings> {
+  const run = settingsQueue.then(() => applySettingsUpdate(patch, services));
+  settingsQueue = run.catch(() => undefined);
+  return run;
+}
+
+async function applySettingsUpdate(
   patch: Partial<Settings>,
   services: BackgroundServices,
 ): Promise<Settings> {

@@ -15,6 +15,7 @@ import {
   FSRS_MIN_RETENTION,
   FSRS_REQUEST_RETENTION,
 } from '../domain/constants';
+import { FSRS6_DEFAULT_DECAY } from '../domain/mastery';
 import type {
   MasteryRating,
   ReviewPreview,
@@ -63,6 +64,11 @@ export function getFsrsParameters(requestRetention = FSRS_REQUEST_RETENTION): FS
   });
   PARAMETER_CACHE.set(normalized, parameters);
   return parameters;
+}
+
+/** 遗忘曲线的衰减参数（w[20]），用于计算记忆概率。 */
+export function getFsrsDecay(requestRetention = FSRS_REQUEST_RETENTION): number {
+  return getFsrsParameters(requestRetention).w[20] ?? FSRS6_DEFAULT_DECAY;
 }
 
 export function replayReviews(

@@ -41,6 +41,27 @@ const discardRequestSchema = z
   })
   .strict();
 
+const unrateRequestSchema = z
+  .object({
+    type: z.literal('submission.unrate'),
+    payload: z.object({ submissionId: z.string().min(1), rating: masteryRatingSchema.optional() }).strict(),
+  })
+  .strict();
+
+const reviewNextRequestSchema = z
+  .object({
+    type: z.literal('review.next'),
+    payload: z.object({ excludeProblemId: z.string().min(1).optional() }).strict().optional(),
+  })
+  .strict();
+
+const reviewContextRequestSchema = z
+  .object({
+    type: z.literal('review.context'),
+    payload: z.object({ problemId: z.string().min(1) }).strict(),
+  })
+  .strict();
+
 const dashboardRequestSchema = z
   .object({
     type: z.literal('dashboard.query'),
@@ -172,6 +193,9 @@ export const extensionRequestSchema = z.discriminatedUnion('type', [
   acceptedRequestSchema,
   rateRequestSchema,
   discardRequestSchema,
+  unrateRequestSchema,
+  reviewNextRequestSchema,
+  reviewContextRequestSchema,
   z
     .object({
       type: z.literal('review.preview'),
