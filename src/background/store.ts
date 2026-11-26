@@ -9,8 +9,10 @@ import type {
   DetectionIssue,
   Difficulty,
   MasteryRating,
+  NextReview,
   ProblemMetadata,
   ProblemRecord,
+  ReviewContext,
   ReviewPreview,
   Settings,
   SubmissionReview,
@@ -35,6 +37,12 @@ import {
   updateProblemsGroup,
   updateProblemsPaused,
 } from './store-mutations';
+import {
+  applySubmissionRating,
+  queryNextReview,
+  queryReviewContext,
+  type RatingResult,
+} from './store-reviews';
 
 export interface AcceptedSubmissionInput {
   readonly metadata: ProblemMetadata;
@@ -64,10 +72,11 @@ export interface ReviewStore {
     readonly review: SubmissionReview;
     readonly nextReviewAt: number | null;
   }>;
-  rateSubmission(submissionId: string, rating: MasteryRating): Promise<{
-    readonly review: SubmissionReview;
-    readonly nextReviewAt: number | null;
-  }>;
+  rateSubmission(submissionId: string, rating: MasteryRating): Promise<RatingResult>;
+  /** 撤销评分：恢复为待评估并重算排期。 */
+  clearRating(submissionId: string, expectedRating?: MasteryRating): Promise<RatingResult>;
+  nextReview(settings: Settings, excludeProblemId?: string): Promise<NextReview>;
+  reviewContext(problemId: string): Promise<ReviewContext>;
   discardSubmission(submissionId: string): Promise<{ readonly problemDeleted: boolean }>;
   preview(problemId: string, submissionId: string): Promise<ReviewPreview>;
   queryDashboard(filter?: DashboardFilter): Promise<DailySummary>;
@@ -142,28 +151,23 @@ export class DexieReviewStore implements ReviewStore {
 
   async rateSubmission(submissionId: string, rating: MasteryRating) {
     const settings = await this.readSettings();
-    return this.db.transaction('rw', this.db.problems, this.db.submissions, async () => {
-      const stored = await this.db.submissions.get(submissionId);
-      if (!stored) throw new AppError('SUBMISSION_NOT_FOUND', `未找到提交 ${submissionId}`);
-      const problem = await this.db.problems.get(stored.problemId);
-      if (!problem) throw new AppError('DATA_INTEGRITY_ERROR', `提交 ${submissionId} 缺少题目记录`);
-      const reviews = await this.db.submissions.where('problemId').equals(stored.problemId).toArray();
-      const rated = reviews.map((review) =>
-        review.submissionId === submissionId ? { ...review, rating } : review,
-      );
-      const requestRetention = resolveRequestRetention(problem, settings);
-      const replayed = this.replay(rated, { requestRetention });
-      const updated = replayed.reviews.find((review) => review.submissionId === submissionId);
-      if (!updated) throw new AppError('DATA_INTEGRITY_ERROR', `FSRS 未返回提交 ${submissionId}`);
-      await this.db.submissions.bulkPut([...replayed.reviews]);
-      await this.db.problems.put({
-        ...problem,
-        fsrsCard: replayed.card,
-        nextReviewAt: replayed.card?.due ?? null,
-        updatedAt: this.now(),
-      });
-      return { review: updated, nextReviewAt: replayed.card?.due ?? null };
-    });
+    return applySubmissionRating(this.mutationContext(), { submissionId, rating }, settings);
+  }
+
+  async clearRating(submissionId: string, expectedRating?: MasteryRating) {
+    const settings = await this.readSettings();
+    const change = expectedRating === undefined
+      ? { submissionId, rating: null }
+      : { submissionId, rating: null, expectedRating };
+    return applySubmissionRating(this.mutationContext(), change, settings);
+  }
+
+  nextReview(settings: Settings, excludeProblemId?: string): Promise<NextReview> {
+    return queryNextReview(this.mutationContext(), settings, excludeProblemId);
+  }
+
+  async reviewContext(problemId: string): Promise<ReviewContext> {
+    return queryReviewContext(this.mutationContext(), problemId, await this.readSettings());
   }
 
   async discardSubmission(submissionId: string): Promise<{ readonly problemDeleted: boolean }> {

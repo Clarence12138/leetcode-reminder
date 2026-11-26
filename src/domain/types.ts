@@ -141,6 +141,35 @@ export interface HistoryImportResult {
 
 export type ReviewPreview = Readonly<Record<MasteryRating, number>>;
 
+/** 下一道该复习的题（按配额与排序策略，排除指定题目）。 */
+export interface NextReview {
+  readonly problem: ProblemRecord | null;
+  /** 题目链接；开启“复习时还原代码”时已带上还原标记。 */
+  readonly url: string | null;
+  /** 排除指定题目后，今日配额内还剩几题。 */
+  readonly remainingToday: number;
+}
+
+export interface ReviewHistoryEntry {
+  readonly submissionId: string;
+  readonly acceptedAt: number;
+  readonly rating: MasteryRating;
+  /**
+   * 这次评分后排的间隔（天）。FSRS 日志的 scheduled_days 记的是评分前的间隔，
+   * 所以取下一次评分日志的值；最后一次取题目卡片的当前间隔。
+   */
+  readonly scheduledDays: number;
+}
+
+/** 页内卡展示用：这道题的复习轨迹与当前记忆概率。 */
+export interface ReviewContext {
+  readonly problem: ProblemRecord | null;
+  /** 已评分记录，按时间从早到晚。 */
+  readonly history: readonly ReviewHistoryEntry[];
+  /** 当前记忆概率 0–1；还没有排期时为 null。 */
+  readonly retrievability: number | null;
+}
+
 export interface BackupV1 {
   readonly format: 'xiaoshuaji-backup/v1';
   readonly exportedAt: string;

@@ -148,6 +148,36 @@ export function partitionDueProblems(options: {
   };
 }
 
+export interface NextDuePick {
+  readonly problem: ProblemRecord | null;
+  /** 排除指定题目后，今日配额内还剩几题（含 problem 本身）。 */
+  readonly remainingToday: number;
+}
+
+/**
+ * 今日队列里的下一题：先按配额与排序策略切出今日题目，再排除 excludeProblemId。
+ * dueProblems 应为已到期的题；暂停的会被忽略。后台 `review.next` 与前端「开始复习」共用。
+ */
+export function pickNextDueProblem(options: {
+  readonly dueProblems: readonly ProblemRecord[];
+  readonly reviews: readonly SubmissionReview[];
+  readonly settings: Pick<
+    Settings,
+    'dailyReviewLimit' | 'queueSortStrategy' | 'defaultRequestRetention' | 'reviewGroups' | 'timezone'
+  >;
+  readonly now?: number;
+  readonly excludeProblemId?: string | undefined;
+}): NextDuePick {
+  const { todayProblems } = partitionDueProblems({
+    dueProblems: options.dueProblems.filter((problem) => !isProblemPaused(problem)),
+    reviews: options.reviews,
+    settings: options.settings,
+    ...(options.now === undefined ? {} : { now: options.now }),
+  });
+  const candidates = todayProblems.filter((problem) => problem.problemId !== options.excludeProblemId);
+  return { problem: candidates[0] ?? null, remainingToday: candidates.length };
+}
+
 function compareDueAsc(left: ProblemRecord, right: ProblemRecord): number {
   const byDue = (left.nextReviewAt ?? 0) - (right.nextReviewAt ?? 0);
   return byDue === 0 ? left.problemId.localeCompare(right.problemId) : byDue;
