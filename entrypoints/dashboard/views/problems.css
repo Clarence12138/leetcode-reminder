@@ -1,0 +1,69 @@
+/* 题库页：筛选栏、表格、批量操作条。颜色全部走变量。 */
+.problems-view { padding-bottom: 96px; }
+
+.pfilters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.psearch { width: 280px; max-width: 100%; }
+.pfilters-spacer { flex: 1; }
+.pfilters-result { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
+.seg-count { margin-left: 2px; color: var(--muted); font-size: 11px; font-weight: 500; }
+.psort { color: var(--muted); }
+
+.ptable-card { overflow: hidden; }
+.ptable td { height: 56px; }
+.ptable td.ck, .ptable th.ck { width: 40px; padding-right: 0; }
+.ptable .ptitle a { display: inline-flex; max-width: 420px; align-items: center; gap: 4px; color: var(--ink); text-decoration: none; }
+.ptable .ptitle a:hover b { color: var(--brand-text); }
+.ptable .ptitle a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.ptable .ptitle b { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ptable .ptitle .no { color: var(--muted); font-size: 12px; }
+.ptable .ptitle .ext { flex: 0 0 auto; color: var(--muted); opacity: 0; transition: opacity .12s; }
+.ptable tr:hover .ptitle .ext, .ptable .ptitle a:focus-visible .ext { opacity: 1; }
+.ptable .ptags { color: var(--muted); font-size: 12px; }
+.ptable .pdue { color: var(--ink-2); white-space: nowrap; }
+.ptable .pdue.over { color: var(--warn); font-weight: 600; }
+.ptable tr.paused td:not(.ck):not(.ra) { opacity: .55; }
+.ptable tr.sel { background: color-mix(in srgb, var(--brand) 6%, var(--surface)); }
+.ptable .ra { width: 96px; text-align: right; }
+.ptable .muted { color: var(--muted); }
+
+.prow-acts { display: inline-flex; align-items: center; justify-content: flex-end; gap: 2px; }
+.prow-acts .iconbtn { opacity: 0; transition: opacity .1s, background-color .12s, transform .1s var(--ease); }
+.ptable tr:hover .prow-acts .iconbtn,
+.ptable tr:focus-within .prow-acts .iconbtn,
+.prow-acts.is-confirming .iconbtn { opacity: 1; }
+.prow-del.confirm { width: auto; gap: 4px; padding: 0 8px; color: var(--again); font-size: 12px; font-weight: 600; }
+
+.ptable-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 12px; border-top: 1px solid var(--line-2); color: var(--muted); font-size: 12px; }
+
+.plink { padding: 0; border: 0; color: inherit; background: none; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+
+.pbatch { position: fixed; bottom: 20px; left: 50%; z-index: 40; display: flex; max-width: calc(100vw - 24px); flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px 6px 6px 14px; border-radius: 12px; color: var(--toast-ink); background: var(--toast-bg); font-size: 13px; box-shadow: 0 14px 36px rgba(0, 0, 0, .28); transform: translateX(-50%); animation: pbatch-in .28s var(--spring); }
+@keyframes pbatch-in { from { opacity: 0; transform: translate(-50%, 16px); } }
+.pbatch-count { margin-right: 8px; font-weight: 600; }
+.pbatch .bb { display: inline-flex; height: 30px; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 7px; color: inherit; background: transparent; font: inherit; font-weight: 600; cursor: pointer; transition: background-color .12s, transform .1s var(--ease); }
+.pbatch .bb:hover:not(:disabled) { background: color-mix(in srgb, var(--toast-ink) 12%, transparent); }
+.pbatch .bb:active:not(:disabled) { transform: scale(.95); }
+.pbatch .bb:disabled { cursor: not-allowed; opacity: .4; }
+.pbatch .bb:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.pbatch .bb.danger { color: var(--again); }
+.pbatch .bb.confirm { color: var(--on-again); background: var(--again); }
+.pbatch .bb.loading { opacity: .7; }
+.pbatch-sep { width: 1px; height: 18px; margin: 0 4px; background: color-mix(in srgb, var(--toast-ink) 20%, transparent); }
+.pbatch .chip { border-color: transparent; color: inherit; background: transparent; font-weight: 600; }
+.pbatch .chip:hover { background: color-mix(in srgb, var(--toast-ink) 12%, transparent); }
+.pbatch .iconbtn { color: inherit; }
+.pbatch-x { opacity: 1; }
+.pbatch .menu { top: auto; bottom: 38px; }
+
+@media (max-width: 900px) {
+  .pcol-tags, .pcol-group { display: none; }
+}
+@media (max-width: 640px) {
+  .psearch { width: 100%; }
+  .pcol-diff { display: none; }
+}
+.pbatch .menu { color: var(--ink); }
+.pcol-default { color: var(--muted); font-size: 12px; }
+
+/* 批量条在底部时，把提示条抬到它上方，避免重叠 */
+body:has(.pbatch) .toast-region { bottom: 84px; }
