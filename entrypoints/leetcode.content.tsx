@@ -15,6 +15,7 @@ import {
   hasReviewResetIntent,
 } from '../src/leetcode/url';
 import { isSubmitShortcut } from '../src/leetcode/shortcut';
+import '../src/ui/tokens.css';
 import '../src/leetcode/content.css';
 
 const SUBMIT_SELECTOR = '[data-e2e-locator="console-submit-button"]';

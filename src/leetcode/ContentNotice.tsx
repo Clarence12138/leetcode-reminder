@@ -1,193 +1,196 @@
-import { useEffect, useState } from 'react';
-import type { MasteryRating } from '../domain/types';
-import type { ContentController, ContentNotice as Notice } from './content-controller';
+import { useEffect, useRef, useState } from 'react';
+import { Icon } from '../ui/Icon';
+import { formatNextReviewIn, ratingLabel } from '../ui/format';
+import {
+  applyAppearanceAttributes,
+  DEFAULT_APPEARANCE,
+  ensurePaletteStyle,
+  readAppearance,
+  subscribeAppearance,
+  type ThemeId,
+} from '../ui/theme/appearance';
+import type { ContentController, ContentNotice as Notice, NextState } from './content-controller';
+import { UNDO_WINDOW_MS } from './content-controller';
+import { Card, CardHead, ProblemName } from './notice-parts';
+import { readPageMode, watchPageMode, type PageMode } from './page-theme';
+import { RatingCard } from './RatingCard';
 
-const RATING_OPTIONS: readonly {
-  readonly rating: MasteryRating;
-  readonly label: string;
-  readonly description: string;
-}[] = [
-  { rating: 'AGAIN', label: '未掌握', description: '无法独立完成' },
-  { rating: 'HARD', label: '吃力', description: '独立完成，但思路不稳或耗时明显' },
-  { rating: 'GOOD', label: '掌握', description: '可以独立完成并讲清思路' },
-  { rating: 'EASY', label: '熟练', description: '快速完成，关键变式也清楚' },
-];
+export const CARD_ROOT_CLASS = 'xsj-root';
+
+type SuccessNotice = Extract<Notice, { readonly kind: 'success' }>;
 
 interface Props {
   readonly controller: ContentController;
 }
 
 export function ContentNotice({ controller }: Props) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const [notice, setNotice] = useState<Notice>({ kind: 'idle' });
-  const [rating, setRating] = useState<MasteryRating | null>(null);
+  const [theme, setTheme] = useState<ThemeId>(DEFAULT_APPEARANCE.theme);
+  const [pageMode, setPageMode] = useState<PageMode>(() => readPageMode());
 
   useEffect(() => controller.subscribe(setNotice), [controller]);
-  if (notice.kind === 'idle') return null;
 
-  if (notice.kind === 'hint') {
-    return <aside className="notice notice--compact">{notice.text}</aside>;
-  }
+  useEffect(() => {
+    let active = true;
+    void readAppearance().then((appearance) => { if (active) setTheme(appearance.theme); });
+    const stop = subscribeAppearance((appearance) => setTheme(appearance.theme));
+    const stopWatch = watchPageMode(setPageMode);
+    return () => { active = false; stop(); stopWatch(); };
+  }, []);
 
-  if (notice.kind === 'monitoring') {
-    return <aside className="notice notice--compact">正在确认本次提交结果…</aside>;
-  }
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const container = root.getRootNode();
+    ensurePaletteStyle(container instanceof ShadowRoot ? container : document, `.${CARD_ROOT_CLASS}`);
+    applyAppearanceAttributes(root, theme, pageMode);
+  }, [theme, pageMode, notice.kind]);
 
-  if (notice.kind === 'error') {
-    return <ErrorNotice controller={controller} notice={notice} />;
-  }
-
-  if (notice.kind === 'success') {
-    return <SuccessNotice controller={controller} notice={notice} />;
-  }
-
-  if (notice.kind === 'discarded') {
-    return <DiscardedNotice controller={controller} notice={notice} />;
-  }
-
-  return <RatingNotice controller={controller} notice={notice} rating={rating} setRating={setRating} />;
+  return (
+    <div className={CARD_ROOT_CLASS} data-mode={pageMode} data-theme={theme} ref={rootRef}>
+      <NoticeBody controller={controller} notice={notice} />
+    </div>
+  );
 }
 
-function RatingNotice({ controller, notice, rating, setRating }: {
-  readonly controller: ContentController;
-  readonly notice: Extract<Notice, { readonly kind: 'rating' }>;
-  readonly rating: MasteryRating | null;
-  readonly setRating: (rating: MasteryRating | null) => void;
-}) {
-  const [discarding, setDiscarding] = useState(false);
+function NoticeBody({ controller, notice }: { readonly controller: ContentController; readonly notice: Notice }) {
+  switch (notice.kind) {
+    case 'idle':
+      return null;
+    case 'hint':
+      return <aside className="xsj-pill" role="status">{notice.text}</aside>;
+    case 'monitoring':
+      return (
+        <aside className="xsj-pill" role="status">
+          <span className="xsj-spinner" aria-hidden="true" />正在确认本次提交结果…
+        </aside>
+      );
+    case 'error':
+      return <ErrorNotice controller={controller} notice={notice} />;
+    case 'success':
+      return <SuccessCard controller={controller} notice={notice} />;
+    case 'discarded':
+      return (
+        <Card className="xsj-card--plain" label="未记录本次提交" role="status">
+          <CardHead icon="minus" onClose={() => controller.dismiss()} title="未记录本次提交" tone="muted" />
+          <p className="xsj-text">{notice.title}</p>
+          <p className="xsj-muted">这条 Accepted 不会进入待评估，也不会改动现有复习计划。</p>
+        </Card>
+      );
+    case 'rating':
+      return <RatingCard controller={controller} notice={notice} />;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 完成态
+
+function SuccessCard({ controller, notice }: { readonly controller: ContentController; readonly notice: SuccessNotice }) {
+  const canUndo = useUndoWindow(notice);
+  const [undoing, setUndoing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const busy = rating !== null || discarding;
 
-  const submitRating = async (value: MasteryRating) => {
-    setRating(value);
+  const undo = async () => {
+    setUndoing(true);
     setError(null);
     try {
-      await controller.rate(value);
-    } finally {
-      setRating(null);
-    }
-  };
-
-  const discard = async () => {
-    setDiscarding(true);
-    setError(null);
-    try {
-      await controller.discard();
+      await controller.undo();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '未能取消记录');
-    } finally {
-      setDiscarding(false);
+      setError(cause instanceof Error ? cause.message : '撤销失败');
+      setUndoing(false);
     }
   };
 
+  const headline = notice.rating
+    ? `已评为「${ratingLabel[notice.rating]}」· ${formatNextReviewIn(notice.nextReviewAt)}`
+    : '复习计划已更新';
   return (
-    <aside className="notice notice--rating" aria-label="选择掌握程度">
-      <header>
-        <div><span className="eyebrow">Accepted 已记录</span><strong>{notice.title}</strong></div>
-        <RatingActions discarding={discarding} disabled={busy} onDefer={() => controller.dismiss()} onDiscard={discard} />
-      </header>
-      <p>请选择这次独立完成题目的程度：</p>
-      <RatingGrid busy={busy} notice={notice} onRate={submitRating} />
-      {notice.previewError && <p className="preview-error">预计日期加载失败：{notice.previewError}</p>}
-      {error && <p className="preview-error" role="alert">{error}</p>}
-      <footer>稍后评估会保留为“待评估”；不记录本次不会生成复习计划。</footer>
-    </aside>
+    <Card label="复习计划已更新" role="status">
+      <CardHead
+        onClose={() => controller.dismiss()}
+        subtitle={<ProblemName problem={notice.problem} />}
+        title={headline}
+      >
+        {canUndo && (
+          <button
+            aria-label="撤销评分"
+            className="xsj-btn xsj-btn--ghost"
+            disabled={undoing}
+            onClick={() => void undo()}
+            type="button"
+          >
+            <Icon name="undo" size={14} />{undoing ? '撤销中…' : '撤销'}
+            <span aria-hidden="true" className="xsj-countdown" style={{ animationDuration: `${UNDO_WINDOW_MS}ms` }} />
+          </button>
+        )}
+      </CardHead>
+      {error && <p className="xsj-err xsj-pad" role="alert">{error}</p>}
+      <NextSection next={notice.next} />
+    </Card>
   );
 }
 
-function RatingActions({
-  discarding,
-  disabled,
-  onDefer,
-  onDiscard,
-}: {
-  readonly discarding: boolean;
-  readonly disabled: boolean;
-  readonly onDefer: () => void;
-  readonly onDiscard: () => Promise<void>;
-}) {
+/** 撤销按钮只在评分后的 5 秒内可用。 */
+function useUndoWindow(notice: SuccessNotice): boolean {
+  const { undoUntil } = notice;
+  const [expired, setExpired] = useState(() => undoUntil === null || undoUntil <= Date.now());
+  useEffect(() => {
+    if (undoUntil === null) return undefined;
+    const timer = window.setTimeout(() => setExpired(true), Math.max(0, undoUntil - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [undoUntil]);
+  return !expired;
+}
+
+function NextSection({ next }: { readonly next: NextState }) {
+  if (next.status === 'loading') {
+    return (
+      <section aria-busy="true" className="xsj-next">
+        <div><small>下一题</small><div className="xsj-ph xsj-ph--line" /></div>
+      </section>
+    );
+  }
+  if (next.status === 'error') {
+    return <section className="xsj-next"><p className="xsj-muted">暂时没能获取下一题。</p></section>;
+  }
+  const { problem, url, remainingToday } = next.next;
+  if (!problem || !url) {
+    return (
+      <section className="xsj-next xsj-next--done">
+        <Icon name="check" size={16} /><p>今日复习已完成</p>
+      </section>
+    );
+  }
   return (
-    <div className="notice-actions">
-      <button disabled={disabled} onClick={onDefer}>稍后评估</button>
-      <button className="notice-discard" disabled={disabled} onClick={() => void onDiscard()}>
-        {discarding ? '处理中…' : '不记录本次'}
-      </button>
-    </div>
+    <section aria-label="下一题" className="xsj-next">
+      <div>
+        <small>下一题 · 今日还剩 {remainingToday} 题</small>
+        <b><ProblemName problem={problem} /></b>
+      </div>
+      <a className="xsj-btn xsj-btn--primary" href={url}>
+        去下一题<Icon name="arrow-right" size={14} />
+      </a>
+    </section>
   );
 }
 
-function RatingGrid({
-  busy,
-  notice,
-  onRate,
-}: {
-  readonly busy: boolean;
-  readonly notice: Extract<Notice, { readonly kind: 'rating' }>;
-  readonly onRate: (rating: MasteryRating) => Promise<void>;
-}) {
-  return (
-    <div className="rating-grid">
-      {RATING_OPTIONS.map((option) => (
-        <button
-          className={`rating rating--${option.rating.toLowerCase()}`}
-          disabled={busy}
-          key={option.rating}
-          onClick={() => void onRate(option.rating)}
-        >
-          <strong>{option.label}</strong>
-          <span>{option.description}</span>
-          <small>{formatPreview(notice.preview?.[option.rating])}</small>
-        </button>
-      ))}
-    </div>
-  );
-}
+// ---------------------------------------------------------------------------
+// 错误
 
 function ErrorNotice({ controller, notice }: {
   readonly controller: ContentController;
   readonly notice: Extract<Notice, { readonly kind: 'error' }>;
 }) {
   return (
-    <aside className="notice notice--error" role="alert">
-      <header><strong>检测失败</strong><button onClick={() => controller.dismiss()}>关闭</button></header>
-      <p>{notice.message}</p>
-      {notice.retryable && <button className="secondary" onClick={() => void controller.retry()}>重新检测</button>}
-    </aside>
+    <Card className="xsj-card--error" label="检测失败" role="alert">
+      <CardHead icon="alert" onClose={() => controller.dismiss()} title="检测失败" tone="danger" />
+      <p className="xsj-text xsj-pad">{notice.message}</p>
+      {notice.retryable && (
+        <footer className="xsj-foot">
+          <button className="xsj-btn xsj-btn--primary" onClick={() => void controller.retry()} type="button">重新检测</button>
+        </footer>
+      )}
+    </Card>
   );
-}
-
-function SuccessNotice({ controller, notice }: {
-  readonly controller: ContentController;
-  readonly notice: Extract<Notice, { readonly kind: 'success' }>;
-}) {
-  return (
-    <aside className="notice notice--success" role="status">
-      <header><strong>复习计划已更新</strong><button onClick={() => controller.dismiss()}>关闭</button></header>
-      <p>{notice.title}</p>
-      <small>{formatNextReview(notice.nextReviewAt)}</small>
-    </aside>
-  );
-}
-
-function DiscardedNotice({ controller, notice }: {
-  readonly controller: ContentController;
-  readonly notice: Extract<Notice, { readonly kind: 'discarded' }>;
-}) {
-  return (
-    <aside className="notice notice--success" role="status">
-      <header><strong>未记录本次提交</strong><button onClick={() => controller.dismiss()}>关闭</button></header>
-      <p>{notice.title}</p>
-      <small>这条 Accepted 不会进入待评估，也不会改动现有复习计划。</small>
-    </aside>
-  );
-}
-
-function formatPreview(timestamp: number | undefined): string {
-  if (!timestamp) return '正在计算下次复习…';
-  return `下次：${new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(timestamp)}`;
-}
-
-function formatNextReview(timestamp: number | null): string {
-  if (!timestamp) return '下次复习时间将在面板中显示。';
-  const value = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium' }).format(timestamp);
-  return `下次复习：${value}`;
 }
