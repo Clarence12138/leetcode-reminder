@@ -1,3 +1,5 @@
+import { extractProblemSlug } from './url';
+
 const RESET_LABELS = ['还原到默认的代码模版', '还原到默认的代码模板', 'Reset to default code definition'] as const;
 const RESET_ICON_SELECTORS = [
   'svg[data-icon="arrow-rotate-left"]',
@@ -29,6 +31,9 @@ export interface CodeResetOptions {
   readonly applySettleMs?: number;
   readonly applyTimeoutMs?: number;
   readonly clock?: CodeResetClock;
+  readonly signal?: AbortSignal;
+  readonly expectedSlug?: string;
+  readonly getHref?: () => string;
 }
 
 interface ResetSession {
@@ -55,20 +60,32 @@ export async function resetEditorToDefaultTemplate(
   }
 }
 
+export function dismissResetConfirmDialog(root: ParentNode = document): boolean {
+  const cancel = findDialogAction(root, CANCEL_LABELS);
+  if (!cancel) return false;
+  cancel.click();
+  return true;
+}
+
 async function runReset(options: CodeResetOptions): Promise<boolean> {
   const session = createSession(options);
+  if (isCancelled(session)) return false;
   const resetButton = await waitFor(() => findResetButton(session.root), {
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     intervalMs: session.intervalMs,
     clock: session.clock,
+    isCancelled: () => isCancelled(session),
   });
-  if (!resetButton) return false;
-  await waitForEditor(session.root, options, session.clock);
+  if (!resetButton || isCancelled(session)) return false;
+  await waitForEditor(session);
+  if (isCancelled(session)) return false;
   await session.clock.sleep(options.settleMs ?? DEFAULT_SETTLE_MS);
+  if (isCancelled(session)) return false;
   const before = readEditorText(session.root);
   await clickResetAndConfirm(resetButton, session);
+  if (isCancelled(session)) return false;
   await waitForTemplateApplied(before, session);
-  return true;
+  return !isCancelled(session);
 }
 
 function createSession(options: CodeResetOptions): ResetSession {
@@ -80,13 +97,27 @@ function createSession(options: CodeResetOptions): ResetSession {
   };
 }
 
+function isCancelled(session: ResetSession): boolean {
+  if (session.options.signal?.aborted) return true;
+  const expected = session.options.expectedSlug;
+  if (!expected) return false;
+  const href = session.options.getHref ? session.options.getHref() : window.location.href;
+  return extractProblemSlug(new URL(href, 'https://leetcode.cn')) !== expected;
+}
+
 async function clickResetAndConfirm(resetButton: HTMLElement, session: ResetSession): Promise<void> {
+  if (isCancelled(session)) return;
   resetButton.click();
   const confirmButton = await waitFor(() => findConfirmButton(session.root), {
     timeoutMs: session.options.confirmTimeoutMs ?? CONFIRM_TIMEOUT_MS,
     intervalMs: session.intervalMs,
     clock: session.clock,
+    isCancelled: () => isCancelled(session),
   });
+  if (isCancelled(session)) {
+    dismissResetConfirmDialog(session.root);
+    return;
+  }
   confirmButton?.click();
 }
 
@@ -94,11 +125,12 @@ async function waitForTemplateApplied(before: string | null, session: ResetSessi
   const settleMs = session.options.applySettleMs ?? DEFAULT_APPLY_SETTLE_MS;
   if (settleMs > 0) await session.clock.sleep(settleMs);
   const timeoutMs = session.options.applyTimeoutMs ?? DEFAULT_APPLY_TIMEOUT_MS;
-  if (before === null || timeoutMs <= 0) return;
+  if (before === null || timeoutMs <= 0 || isCancelled(session)) return;
   await waitFor(() => changedEditorText(session.root, before), {
     timeoutMs,
     intervalMs: session.intervalMs,
     clock: session.clock,
+    isCancelled: () => isCancelled(session),
   });
 }
 
@@ -114,17 +146,14 @@ function readEditorText(root: ParentNode): string | null {
   return lines.textContent ?? '';
 }
 
-async function waitForEditor(
-  root: ParentNode,
-  options: CodeResetOptions,
-  clock: CodeResetClock,
-): Promise<void> {
-  const timeoutMs = options.editorTimeoutMs ?? 8_000;
+async function waitForEditor(session: ResetSession): Promise<void> {
+  const timeoutMs = session.options.editorTimeoutMs ?? 8_000;
   if (timeoutMs <= 0) return;
-  await waitFor(() => root.querySelector('.monaco-editor .view-line'), {
+  await waitFor(() => session.root.querySelector('.monaco-editor .view-line'), {
     timeoutMs,
-    intervalMs: options.intervalMs ?? DEFAULT_INTERVAL_MS,
-    clock,
+    intervalMs: session.intervalMs,
+    clock: session.clock,
+    isCancelled: () => isCancelled(session),
   });
 }
 
@@ -146,13 +175,18 @@ function isResetLabel(element: HTMLElement): boolean {
 }
 
 function findConfirmButton(root: ParentNode): HTMLElement | null {
+  return findDialogAction(root, CONFIRM_LABELS);
+}
+
+function findDialogAction(root: ParentNode, targetLabels: ReadonlySet<string>): HTMLElement | null {
   const marker = findConfirmMarker(root);
   if (!marker) return null;
   let scope: HTMLElement | null = marker;
   for (let depth = 0; depth < 8 && scope; depth += 1) {
+    const target = findClickable(scope, (element) => targetLabels.has(normalize(element.textContent)));
     const confirm = findClickable(scope, (element) => CONFIRM_LABELS.has(normalize(element.textContent)));
     const cancel = findClickable(scope, (element) => CANCEL_LABELS.has(normalize(element.textContent)));
-    if (confirm && cancel) return confirm;
+    if (target && confirm && cancel) return target;
     scope = scope.parentElement;
   }
   return null;
@@ -197,11 +231,13 @@ interface WaitOptions {
   readonly timeoutMs: number;
   readonly intervalMs: number;
   readonly clock: CodeResetClock;
+  readonly isCancelled?: () => boolean;
 }
 
 async function waitFor<T>(probe: () => T | null, options: WaitOptions): Promise<T | null> {
   const deadline = options.clock.now() + options.timeoutMs;
   while (true) {
+    if (options.isCancelled?.()) return null;
     const found = probe();
     if (found) return found;
     if (options.clock.now() >= deadline) return null;

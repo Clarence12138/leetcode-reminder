@@ -1,12 +1,17 @@
 import { createRoot } from 'react-dom/client';
+import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { createShadowRootUi } from 'wxt/utils/content-script-ui/shadow-root';
 import { ContentNotice } from '../src/leetcode/ContentNotice';
 import { LeetCodeCnClient } from '../src/leetcode/api-client';
 import { readCookieValue } from '../src/leetcode/cookies';
 import { ContentController } from '../src/leetcode/content-controller';
 import { SubmissionDetector, type DetectorRoute } from '../src/leetcode/detector';
-import { resetEditorToDefaultTemplate } from '../src/leetcode/code-reset';
+import {
+  dismissResetConfirmDialog,
+  resetEditorToDefaultTemplate,
+} from '../src/leetcode/code-reset';
 import { coverEditorCode } from '../src/leetcode/editor-cover';
+import { getNavigationApi, watchCommittedLocation } from '../src/leetcode/location-watcher';
 import {
   captureReviewResetIntent,
   clearReviewResetIntent,
@@ -29,12 +34,33 @@ export default defineContentScript({
   cssInjectionMode: 'ui',
   async main(ctx) {
     captureReviewResetIntent(window.location.href, sessionStorage, history);
-    void syncDisplayTimezone();
     const controller = new ContentController();
     const detector = createDetector(controller);
     controller.setRetryHandler(() => detector.retryLast());
-    startReviewCodeReset(controller, window.location.href);
 
+    const initialUrl = new URL(window.location.href);
+    let currentSlug = extractProblemSlug(initialUrl);
+    const cancelReset = startPageLoadCodeReset(ctx, controller, currentSlug);
+
+    ctx.addEventListener(document, 'click', (event) => handleSubmitClick(event, detector), { capture: true });
+    ctx.addEventListener(window, 'keydown', (event) => handleSubmitShortcut(event, detector), { capture: true });
+    watchCommittedLocation({
+      signal: ctx.signal,
+      getHref: () => window.location.href,
+      navigation: getNavigationApi(),
+      setInterval: (handler, ms) => ctx.setInterval(handler, ms),
+    }, (newUrl) => {
+      const nextSlug = extractProblemSlug(newUrl);
+      if (nextSlug !== currentSlug) {
+        currentSlug = nextSlug;
+        cancelReset();
+        controller.dismissError();
+      }
+      detector.updateRoute(toDetectorRoute(newUrl));
+    });
+    detector.updateRoute(toDetectorRoute(initialUrl));
+
+    void syncDisplayTimezone();
     const ui = await createShadowRootUi(ctx, {
       name: 'xiaoshuaji-review-ui',
       position: 'overlay',
@@ -52,14 +78,6 @@ export default defineContentScript({
       },
     });
     ui.autoMount({ once: true });
-
-    ctx.addEventListener(document, 'click', (event) => handleSubmitClick(event, detector), true);
-    ctx.addEventListener(window, 'keydown', (event) => handleSubmitShortcut(event, detector), true);
-    ctx.addEventListener(window, 'wxt:locationchange', ({ newUrl }) => {
-      detector.updateRoute(toDetectorRoute(newUrl));
-      startReviewCodeReset(controller, newUrl.href);
-    });
-    detector.updateRoute(toDetectorRoute(window.location));
   },
 });
 
@@ -97,23 +115,75 @@ function toDetectorRoute(location: Pick<Location, 'pathname'>): DetectorRoute {
   };
 }
 
-let codeResetStarted = false;
-
-function startReviewCodeReset(controller: ContentController, href: string): void {
-  captureReviewResetIntent(href, sessionStorage, history);
-  const slug = extractProblemSlug(new URL(href, 'https://leetcode.cn'));
-  if (!slug || !hasReviewResetIntent(slug, sessionStorage) || codeResetStarted) return;
-  codeResetStarted = true;
-  const uncover = coverEditorCode();
-  void performCodeReset(controller, slug).finally(uncover);
+interface CodeResetRun {
+  readonly controller: ContentController;
+  readonly slug: string;
+  readonly signal: AbortSignal;
+  readonly onDone: () => void;
+  readonly scheduleHintDismiss: () => void;
 }
 
-async function performCodeReset(controller: ContentController, slug: string): Promise<void> {
+function startPageLoadCodeReset(
+  ctx: ContentScriptContext,
+  controller: ContentController,
+  slug: string | null,
+): () => void {
+  if (!slug || !hasReviewResetIntent(slug, sessionStorage)) return () => undefined;
+  const resetAbort = new AbortController();
+  const uncover = coverEditorCode();
+  let resetActive = true;
+  let hintTimer: number | null = null;
+
+  const cancel = (): void => {
+    const hadHintTimer = hintTimer !== null;
+    if (hintTimer !== null) {
+      window.clearTimeout(hintTimer);
+      hintTimer = null;
+    }
+    if (!resetActive) {
+      if (hadHintTimer) controller.dismissHint();
+      return;
+    }
+    resetActive = false;
+    resetAbort.abort();
+    dismissResetConfirmDialog();
+    uncover();
+    clearReviewResetIntent(slug, sessionStorage);
+    controller.dismissHint();
+  };
+
+  ctx.onInvalidated(cancel);
+  void performCodeReset({
+    controller,
+    slug,
+    signal: resetAbort.signal,
+    onDone: () => {
+      resetActive = false;
+      uncover();
+    },
+    scheduleHintDismiss: () => {
+      hintTimer = ctx.setTimeout(() => {
+        hintTimer = null;
+        controller.dismissHint();
+      }, HINT_DISMISS_MS);
+    },
+  });
+  return cancel;
+}
+
+async function performCodeReset(run: CodeResetRun): Promise<void> {
+  const { controller, slug, signal, onDone, scheduleHintDismiss } = run;
   controller.showHint('正在还原默认代码模板…');
-  const ok = await resetEditorToDefaultTemplate();
-  clearReviewResetIntent(slug, sessionStorage);
-  controller.showHint(ok ? '已还原为默认代码模板' : '未能自动还原，请手动点击编辑器右上角圆形还原按钮');
-  window.setTimeout(() => controller.dismissHint(), HINT_DISMISS_MS);
+  try {
+    const ok = await resetEditorToDefaultTemplate({ signal, expectedSlug: slug });
+    if (signal.aborted) return;
+    clearReviewResetIntent(slug, sessionStorage);
+    onDone();
+    controller.showHint(ok ? '已还原为默认代码模板' : '未能自动还原，请手动点击编辑器右上角圆形还原按钮');
+    scheduleHintDismiss();
+  } finally {
+    if (!signal.aborted) onDone();
+  }
 }
 
 function handleSubmitClick(event: Event, detector: SubmissionDetector): void {

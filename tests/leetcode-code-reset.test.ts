@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { resetEditorToDefaultTemplate } from '../src/leetcode/code-reset';
+import { dismissResetConfirmDialog, resetEditorToDefaultTemplate } from '../src/leetcode/code-reset';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -78,6 +78,53 @@ describe('resetEditorToDefaultTemplate', () => {
 
     await expect(resetEditorToDefaultTemplate(fastOptions({ applyTimeoutMs: 200 }))).resolves.toBe(true);
     expect(viewLines.viewLines.textContent).toBe('class Solution {}');
+  });
+
+  it('signal 中止后立即停止轮询且不点击还原', async () => {
+    const clicks: string[] = [];
+    const abort = new AbortController();
+    abort.abort();
+    document.body.append(iconResetButton(() => clicks.push('reset')));
+
+    await expect(resetEditorToDefaultTemplate({
+      ...fastOptions(),
+      signal: abort.signal,
+    })).resolves.toBe(false);
+    expect(clicks).toEqual([]);
+  });
+
+  it('点击还原与等待确认之间发生切题或中止时自动点击取消而不确认', async () => {
+    const clicks: string[] = [];
+    const abort = new AbortController();
+    document.body.append(iconResetButton(() => {
+      clicks.push('reset');
+      document.body.append(resetConfirmDialog({ clicks }));
+      abort.abort();
+    }));
+
+    await expect(resetEditorToDefaultTemplate({
+      ...fastOptions(),
+      signal: abort.signal,
+    })).resolves.toBe(false);
+    expect(clicks).toEqual(['reset', '取消']);
+  });
+
+  it('expectedSlug 与当前路由不一致时不再点击还原并能关闭残留确认框', async () => {
+    const clicks: string[] = [];
+    let href = 'https://leetcode.cn/problems/two-sum/description/';
+    document.body.append(iconResetButton(() => clicks.push('reset')));
+
+    href = 'https://leetcode.cn/problems/add-two-numbers/description/';
+    await expect(resetEditorToDefaultTemplate({
+      ...fastOptions(),
+      expectedSlug: 'two-sum',
+      getHref: () => href,
+    })).resolves.toBe(false);
+    expect(clicks).toEqual([]);
+
+    document.body.append(resetConfirmDialog({ clicks }));
+    expect(dismissResetConfirmDialog()).toBe(true);
+    expect(clicks).toEqual(['取消']);
   });
 });
 
