@@ -26,7 +26,7 @@ export interface SelectProps<T extends string = string> {
   readonly size?: 'sm' | 'md' | undefined;
 }
 
-interface PopPosition { readonly above: boolean; readonly style: CSSProperties }
+export interface PopPosition { readonly above: boolean; readonly style: CSSProperties }
 const POP_GAP = 6;
 const VIEWPORT_PAD = 8;
 const MAX_POP_HEIGHT = 280;
@@ -171,7 +171,7 @@ function SelectPopover<T extends string>({ activeIndex, ariaLabel, listId, onCho
   );
 }
 
-function SelectOptionRow<T extends string>({ active, id, onChoose, onHover, option, selected }: {
+export function SelectOptionRow<T extends string>({ active, id, onChoose, onHover, option, selected }: {
   readonly active: boolean;
   readonly id: string;
   readonly onChoose: () => void;
@@ -253,16 +253,17 @@ function findLastEnabledIndex<T extends string>(options: readonly SelectOption<T
   return -1;
 }
 
-function usePopPosition({ align, open, popRef, triggerRef }: {
+export function usePopPosition({ align, maxHeight = MAX_POP_HEIGHT, open, popRef, triggerRef }: {
   readonly align: 'left' | 'right';
+  readonly maxHeight?: number;
   readonly open: boolean;
   readonly popRef: RefObject<HTMLDivElement | null>;
-  readonly triggerRef: RefObject<HTMLButtonElement | null>;
+  readonly triggerRef: RefObject<HTMLElement | null>;
 }): PopPosition {
   const [position, setPosition] = useState<PopPosition>({ above: false, style: {} });
   const update = useEffectEvent((): void => {
     const trigger = triggerRef.current;
-    if (trigger) setPosition(computePopPosition({ align, pop: popRef.current, trigger }));
+    if (trigger) setPosition(computePopPosition({ align, maxPopHeight: maxHeight, pop: popRef.current, trigger }));
   });
   useLayoutEffect(() => {
     if (!open) return undefined;
@@ -274,19 +275,20 @@ function usePopPosition({ align, open, popRef, triggerRef }: {
   return position;
 }
 
-function computePopPosition({ align, pop, trigger }: {
+function computePopPosition({ align, maxPopHeight, pop, trigger }: {
   readonly align: 'left' | 'right';
+  readonly maxPopHeight: number;
   readonly pop: HTMLDivElement | null;
-  readonly trigger: HTMLButtonElement;
+  readonly trigger: HTMLElement;
 }): PopPosition {
   const rect = trigger.getBoundingClientRect();
   const minWidth = Math.max(rect.width, 160);
   const popWidth = Math.max(pop?.offsetWidth ?? 0, minWidth);
-  const popHeight = Math.min(pop?.scrollHeight ?? 180, MAX_POP_HEIGHT);
+  const popHeight = Math.min(pop?.scrollHeight ?? 180, maxPopHeight);
   const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_PAD;
   const spaceAbove = rect.top - VIEWPORT_PAD;
   const above = spaceBelow < popHeight + POP_GAP && spaceAbove > spaceBelow;
-  const maxHeight = Math.max(120, Math.min(MAX_POP_HEIGHT, (above ? spaceAbove : spaceBelow) - POP_GAP));
+  const maxHeight = Math.max(120, Math.min(maxPopHeight, (above ? spaceAbove : spaceBelow) - POP_GAP));
   const rawLeft = align === 'right' ? rect.right - popWidth : rect.left;
   const left = Math.min(Math.max(VIEWPORT_PAD, rawLeft), Math.max(VIEWPORT_PAD, window.innerWidth - popWidth - VIEWPORT_PAD));
   const style: CSSProperties = above
@@ -295,11 +297,11 @@ function computePopPosition({ align, pop, trigger }: {
   return { above, style };
 }
 
-function useDismissPop({ onClose, open, popRef, triggerRef }: {
+export function useDismissPop({ onClose, open, popRef, triggerRef }: {
   readonly onClose: () => void;
   readonly open: boolean;
   readonly popRef: RefObject<HTMLDivElement | null>;
-  readonly triggerRef: RefObject<HTMLButtonElement | null>;
+  readonly triggerRef: RefObject<HTMLElement | null>;
 }): void {
   const handleOutside = useEffectEvent((event: Event): void => {
     const target = event.target;
