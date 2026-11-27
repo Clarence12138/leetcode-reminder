@@ -4,6 +4,7 @@ import { sendExtensionRequest } from '../../../../src/shared/messaging';
 import { Button, InlineNotice, Switch } from '../../../../src/ui/components';
 import { parseTimeValue, toTimeValue } from '../../../../src/ui/format';
 import { SettingRow, Section } from './parts';
+import { TimezoneSetting } from './TimezoneSetting';
 import { toErrorNotice, useDraft, useSettingsSaver, type Notice } from './use-saver';
 
 export function ReminderSection({ refresh, settings }: { readonly refresh: () => Promise<void>; readonly settings: Settings }): React.ReactElement {
@@ -35,7 +36,8 @@ export function ReminderSection({ refresh, settings }: { readonly refresh: () =>
       <SettingRow description="每天按当前时区汇总到期题目和待评估提交。" label="启用复习通知">
         <Switch checked={enabled} disabled={saving} label="启用复习通知" onChange={(next) => void toggle(next)} />
       </SettingRow>
-      <SettingRow description={`当前时区：${settings.timezone}；修改后移开焦点或按回车保存`} label="提醒时间">
+      <TimezoneSetting save={save} saving={saving} settings={settings} />
+      <SettingRow description={`按 ${settings.timezone} 时间提醒；修改后移开焦点或按回车保存`} label="提醒时间">
         <label className="field timef">
           <input
             aria-label="每日提醒时间"

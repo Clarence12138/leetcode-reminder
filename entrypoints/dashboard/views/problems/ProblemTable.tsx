@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { isProblemPaused, resolveProblemGroup } from '../../../../src/domain/queue-policy';
 import type { ProblemRecord, ReviewGroup } from '../../../../src/domain/types';
 import { Button, Card, Checkbox, cx, DifficultyBadge, EmptyState, IconButton, Pill } from '../../../../src/ui/components';
-import { calendarDaysBetween, formatDate, formatDateTime } from '../../../../src/ui/format';
+import { calendarDaysBetween, formatDate, formatDateTime, formatInDisplayZone } from '../../../../src/ui/format';
 import { Icon } from '../../../../src/ui/Icon';
 import { pauseNotice, requestDelete, requestSetPaused, type ActionRunner, type ProblemSelection } from './problem-actions';
 
@@ -188,8 +188,6 @@ function RowActions({ paused, problem, refresh, runner }: {
   );
 }
 
-const monthDayFormatter = new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' });
-
 /** 下次复习：逾期 N 天 / 今天 / 明天 / N 天后 / 1月28日（跨年带年份）。 */
 function describeDue(timestamp: number): { readonly text: string; readonly overdue: boolean } {
   const days = calendarDaysBetween(timestamp);
@@ -197,8 +195,8 @@ function describeDue(timestamp: number): { readonly text: string; readonly overd
   if (days === 0) return { text: '今天', overdue: false };
   if (days === 1) return { text: '明天', overdue: false };
   if (days < 14) return { text: `${days} 天后`, overdue: false };
-  const sameYear = new Date(timestamp).getFullYear() === new Date().getFullYear();
-  return { text: sameYear ? monthDayFormatter.format(timestamp) : formatDate(timestamp), overdue: false };
+  const sameYear = formatInDisplayZone(timestamp, { year: 'numeric' }) === formatInDisplayZone(Date.now(), { year: 'numeric' });
+  return { text: sameYear ? formatInDisplayZone(timestamp, { month: 'short', day: 'numeric' }) : formatDate(timestamp), overdue: false };
 }
 
 function percent(ratio: number): string {

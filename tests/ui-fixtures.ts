@@ -57,6 +57,7 @@ export const settings: Settings = {
   reminderHour: 9,
   reminderMinute: 0,
   timezone: 'Asia/Shanghai',
+  timezoneMode: 'system',
   schemaVersion: 1,
   resetCodeOnReview: false,
   dailyReviewLimit: null,

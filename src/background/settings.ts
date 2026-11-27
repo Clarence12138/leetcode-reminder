@@ -52,9 +52,9 @@ export class ChromeSettingsRepository implements SettingsRepository {
   }
 
   async update(patch: Partial<Settings>): Promise<Settings> {
-    assertManagedFields(patch, this.getTimezone());
+    assertManagedFields(patch);
     const current = await this.get();
-    const merged = mergeSettingsPatch(current, patch);
+    const merged = resolveTimezone(mergeSettingsPatch(current, patch), patch, this.getTimezone());
     const settings = settingsSchema.parse(merged);
     assertValidGroupConfig(settings);
     await this.storage.set({ [SETTINGS_STORAGE_KEY]: settings });
@@ -62,8 +62,9 @@ export class ChromeSettingsRepository implements SettingsRepository {
   }
 
   async replace(settings: Settings): Promise<Settings> {
-    const parsed = settingsSchema.parse({ ...settings, timezone: this.getTimezone() });
-    const normalized = sanitizeGroupReferences(parsed);
+    const parsed = settingsSchema.parse(settings);
+    const withTimezone = parsed.timezoneMode === 'manual' ? parsed : { ...parsed, timezone: this.getTimezone() };
+    const normalized = sanitizeGroupReferences(withTimezone);
     assertUniqueGroupIds(normalized.reviewGroups);
     await this.storage.set({ [SETTINGS_STORAGE_KEY]: normalized });
     return normalized;
@@ -78,6 +79,7 @@ export class ChromeSettingsRepository implements SettingsRepository {
 
   async ensureCurrentTimezone() {
     const settings = await this.get();
+    if (settings.timezoneMode === 'manual') return { settings, changed: false };
     const timezone = this.getTimezone();
     if (settings.timezone === timezone) return { settings, changed: false };
     const updated = { ...settings, timezone };
@@ -115,6 +117,7 @@ export function createDefaultSettings(timezone = systemTimezone()): Settings {
     reminderHour: DEFAULT_REMINDER_HOUR,
     reminderMinute: DEFAULT_REMINDER_MINUTE,
     timezone,
+    timezoneMode: 'system',
     schemaVersion: CURRENT_SCHEMA_VERSION,
     resetCodeOnReview: false,
     dailyReviewLimit: null,
@@ -131,13 +134,22 @@ export function systemTimezone(): string {
   return timezone;
 }
 
-function assertManagedFields(patch: Partial<Settings>, timezone: string): void {
+function assertManagedFields(patch: Partial<Settings>): void {
   if (patch.schemaVersion !== undefined && patch.schemaVersion !== CURRENT_SCHEMA_VERSION) {
     throw new AppError('SCHEMA_VERSION_READONLY', '设置数据版本不可手动修改');
   }
-  if (patch.timezone !== undefined && patch.timezone !== timezone) {
-    throw new AppError('TIMEZONE_MANAGED', '时区由系统自动管理');
+}
+
+/**
+ * 跟随系统时：时区始终取系统值，手动传入不同的时区会被拒绝；
+ * 切到手动时：未指定时区则沿用当前生效的时区，避免切换瞬间“今天”跳变。
+ */
+function resolveTimezone(merged: Settings, patch: Partial<Settings>, systemZone: string): Settings {
+  if (merged.timezoneMode === 'manual') return merged;
+  if (patch.timezone !== undefined && patch.timezone !== systemZone) {
+    throw new AppError('TIMEZONE_MANAGED', '当前跟随系统时区，请先关闭「跟随系统时区」再手动设置');
   }
+  return { ...merged, timezone: systemZone };
 }
 
 function mergeSettingsPatch(current: Settings, patch: Partial<Settings>): Settings {

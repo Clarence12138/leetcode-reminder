@@ -4,6 +4,8 @@ export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 export type MasteryRating = 'AGAIN' | 'HARD' | 'GOOD' | 'EASY';
 export type SubmissionTrigger = 'button' | 'keyboard' | 'import';
 export type QueueSortStrategy = 'due_asc' | 'priority' | 'stability_asc';
+/** system：跟随浏览器/系统时区自动同步；manual：使用用户指定的 `timezone`。 */
+export type TimezoneMode = 'system' | 'manual';
 
 export interface ReviewGroup {
   readonly id: string;
@@ -96,7 +98,9 @@ export interface Settings {
   readonly notificationsEnabled: boolean;
   readonly reminderHour: number;
   readonly reminderMinute: number;
+  /** 当前生效的 IANA 时区；`timezoneMode` 为 system 时由后台自动同步。 */
   readonly timezone: string;
+  readonly timezoneMode: TimezoneMode;
   readonly schemaVersion: number;
   readonly resetCodeOnReview: boolean;
   readonly dailyReviewLimit: number | null;

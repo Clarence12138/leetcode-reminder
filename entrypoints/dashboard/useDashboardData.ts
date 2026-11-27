@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DailySummary, Settings } from '../../src/domain/types';
 import { sendExtensionRequest } from '../../src/shared/messaging';
+import { setDisplayTimezone } from '../../src/ui/format';
 
 export interface DashboardData {
   readonly settings: Settings;
@@ -57,6 +58,7 @@ async function fetchDashboardData(): Promise<DashboardData> {
     sendExtensionRequest({ type: 'dashboard.query' }),
     sendExtensionRequest({ type: 'settings.get' }),
   ]);
+  setDisplayTimezone(settings.timezone);
   return { settings, summary };
 }
 

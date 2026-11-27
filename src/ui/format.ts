@@ -5,8 +5,7 @@ import type {
   ProblemRecord,
   SubmissionReview,
 } from '../domain/types';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { dayKeyDiff, localDayKey, runtimeTimezone } from '../domain/day-keys';
 
 export const difficultyLabel: Readonly<Record<Difficulty, string>> = {
   EASY: '简单',
@@ -30,30 +29,44 @@ export const issueLabel: Readonly<Record<DetectionIssueCode, string>> = {
   CONTEXT_CHANGED: '页面已切换',
 };
 
-const dateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
-  month: 'short',
-  day: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
+/**
+ * 页面展示用的时区：拿到设置后由各入口调用 `setDisplayTimezone`，
+ * 未设置时回退到运行环境时区。所有“今天/明天/日期”展示都按它计算。
+ */
+let displayTimezone: string | undefined;
+const formatterCache = new Map<string, Intl.DateTimeFormat>();
 
-const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
-  year: 'numeric',
-  month: 'short',
-  day: 'numeric',
-});
+export function setDisplayTimezone(timezone: string | undefined): void {
+  displayTimezone = timezone;
+}
+
+export function getDisplayTimezone(): string {
+  return displayTimezone ?? runtimeTimezone();
+}
+
+/** 按展示时区格式化，`options` 不含 timeZone。 */
+export function formatInDisplayZone(timestamp: number, options: Intl.DateTimeFormatOptions): string {
+  const timezone = getDisplayTimezone();
+  const key = `${timezone}|${JSON.stringify(options)}`;
+  let formatter = formatterCache.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('zh-CN', { ...options, timeZone: timezone });
+    formatterCache.set(key, formatter);
+  }
+  return formatter.format(timestamp);
+}
 
 export function formatDateTime(timestamp: number): string {
-  return dateTimeFormatter.format(new Date(timestamp));
+  return formatInDisplayZone(timestamp, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export function formatDate(timestamp: number): string {
-  return dateFormatter.format(new Date(timestamp));
+  return formatInDisplayZone(timestamp, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export function formatDue(timestamp: number | null, now = Date.now()): string {
   if (timestamp === null) return '待首次评估';
-  const days = Math.round((startOfDay(timestamp) - startOfDay(now)) / DAY_MS);
+  const days = calendarDaysBetween(timestamp, now);
   if (days < -1) return `逾期 ${Math.abs(days)} 天`;
   if (days === -1) return '昨天到期';
   if (days === 0) return '今天到期';
@@ -61,9 +74,10 @@ export function formatDue(timestamp: number | null, now = Date.now()): string {
   return `${days} 天后复习`;
 }
 
-/** 从 now 所在的本地日期到 timestamp 所在日期相差的天数（按日历日，不按 24 小时）。 */
+/** 从 now 所在日期到 timestamp 所在日期相差的天数（按展示时区的日历日，不按 24 小时）。 */
 export function calendarDaysBetween(timestamp: number, now = Date.now()): number {
-  return Math.round((startOfDay(timestamp) - startOfDay(now)) / DAY_MS);
+  const timezone = getDisplayTimezone();
+  return dayKeyDiff(localDayKey(now, timezone), localDayKey(timestamp, timezone));
 }
 
 /** 间隔天数的简短写法：今天 / 明天 / 9 天 / 3 个月 / 1.5 年。 */
@@ -100,11 +114,6 @@ export function parseTimeValue(value: string): { readonly hour: number; readonly
   const minute = Number(match[2]);
   if (hour > 23 || minute > 59) throw new Error('提醒时间超出范围');
   return { hour, minute };
-}
-
-function startOfDay(timestamp: number): number {
-  const date = new Date(timestamp);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
 function padTime(value: number): string {

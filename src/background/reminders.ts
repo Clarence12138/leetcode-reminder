@@ -1,4 +1,5 @@
 import { ALARM_NAME, APP_NAME } from '../domain/constants';
+import { localDayKey, shiftDayKey, zonedTimeToEpoch } from '../domain/day-keys';
 import { computeDailyQuota } from '../domain/queue-policy';
 import type { Settings } from '../domain/types';
 import { AppError } from './errors';
@@ -141,9 +142,9 @@ export class ReminderCoordinator {
 
   private async createDailySummaryIfNeeded(settings: Settings): Promise<void> {
     if (!settings.notificationsEnabled) return;
-    const date = localDateKey(new Date(this.now()));
+    const date = localDayKey(this.now(), settings.timezone);
     if ((await this.settings.getLastNotificationDate()) === date) return;
-    const counts = await this.store.getAttentionCounts(endOfLocalDay(this.now()));
+    const counts = await this.store.getAttentionCounts(endOfLocalDay(this.now(), settings.timezone));
     const effectiveDue = await this.resolveEffectiveDue(counts.due, settings);
     if (effectiveDue + counts.pending === 0) return;
 
@@ -199,30 +200,28 @@ export class ReminderCoordinator {
   }
 }
 
-export function nextReminderTime(now: number, settings: Pick<Settings, 'reminderHour' | 'reminderMinute'>): Date {
-  const next = new Date(now);
-  next.setHours(settings.reminderHour, settings.reminderMinute, 0, 0);
-  if (next.getTime() <= now) next.setDate(next.getDate() + 1);
-  return next;
+type ReminderClock = Pick<Settings, 'reminderHour' | 'reminderMinute' | 'timezone'>;
+
+/** 设置时区里下一次 `reminderHour:reminderMinute`（严格晚于 now）。 */
+export function nextReminderTime(now: number, settings: ReminderClock): Date {
+  const today = localDayKey(now, settings.timezone);
+  const todayAt = reminderAt(today, settings);
+  if (todayAt > now) return new Date(todayAt);
+  return new Date(reminderAt(shiftDayKey(today, 1), settings));
 }
 
-export function localDateKey(date: Date): string {
-  const year = String(date.getFullYear());
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-export function endOfLocalDay(now: number): number {
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-  return end.getTime();
+/** 设置时区里 now 所在日期的最后一毫秒。 */
+export function endOfLocalDay(now: number, timezone: string): number {
+  const tomorrow = shiftDayKey(localDayKey(now, timezone), 1);
+  return zonedTimeToEpoch(tomorrow, { hour: 0, minute: 0 }, timezone) - 1;
 }
 
 function hasPassedReminder(now: number, settings: Settings): boolean {
-  const reminder = new Date(now);
-  reminder.setHours(settings.reminderHour, settings.reminderMinute, 0, 0);
-  return now >= reminder.getTime();
+  return now >= reminderAt(localDayKey(now, settings.timezone), settings);
+}
+
+function reminderAt(day: string, settings: ReminderClock): number {
+  return zonedTimeToEpoch(day, { hour: settings.reminderHour, minute: settings.reminderMinute }, settings.timezone);
 }
 
 function badgeTitle(counts: AttentionCounts): string {

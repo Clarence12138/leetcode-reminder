@@ -10,6 +10,7 @@ import {
 import type { DailySummary, ProblemRecord, Settings, SubmissionReview } from '../../src/domain/types';
 import { withReviewResetIntent } from '../../src/leetcode/url';
 import { sendExtensionRequest } from '../../src/shared/messaging';
+import { setDisplayTimezone } from '../../src/ui/format';
 
 /** 新用户引导里「去力扣做题」打开的页面。 */
 export const LEETCODE_PROBLEMSET_URL = 'https://leetcode.cn/problemset/';
@@ -45,6 +46,7 @@ export async function fetchPopupData(): Promise<PopupData> {
     sendExtensionRequest({ type: 'dashboard.query' }),
     sendExtensionRequest({ type: 'settings.get' }),
   ]);
+  setDisplayTimezone(settings.timezone);
   return { summary, settings };
 }
 
