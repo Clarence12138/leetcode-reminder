@@ -15,6 +15,8 @@ import {
   hasReviewResetIntent,
 } from '../src/leetcode/url';
 import { isSubmitShortcut } from '../src/leetcode/shortcut';
+import { sendExtensionRequest } from '../src/shared/messaging';
+import { setDisplayTimezone } from '../src/ui/format';
 import '../src/ui/tokens.css';
 import '../src/leetcode/content.css';
 
@@ -27,6 +29,7 @@ export default defineContentScript({
   cssInjectionMode: 'ui',
   async main(ctx) {
     captureReviewResetIntent(window.location.href, sessionStorage, history);
+    void syncDisplayTimezone();
     const controller = new ContentController();
     const detector = createDetector(controller);
     controller.setRetryHandler(() => detector.retryLast());
@@ -59,6 +62,16 @@ export default defineContentScript({
     detector.updateRoute(toDetectorRoute(window.location));
   },
 });
+
+/** 评分卡里的“明天/9 天后/日期”按设置时区显示；读取失败时保持浏览器时区。 */
+async function syncDisplayTimezone(): Promise<void> {
+  try {
+    const settings = await sendExtensionRequest({ type: 'settings.get' });
+    setDisplayTimezone(settings.timezone);
+  } catch {
+    // 读不到设置不影响做题检测，按浏览器时区展示即可。
+  }
+}
 
 function createDetector(controller: ContentController): SubmissionDetector {
   const client = new LeetCodeCnClient({

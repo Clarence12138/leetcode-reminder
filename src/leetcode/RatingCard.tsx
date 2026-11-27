@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MasteryRating, ReviewContext, ReviewPreview } from '../domain/types';
-import { calendarDaysBetween, formatInterval, ratingLabel } from '../ui/format';
+import { calendarDaysBetween, formatInDisplayZone, formatInterval, ratingLabel } from '../ui/format';
 import { RATING_ORDER, isEditableTarget } from '../ui/rating';
 import type { ContentController, ContentNotice as Notice } from './content-controller';
 import { Card, CardHead, ProblemName } from './notice-parts';
@@ -196,7 +196,6 @@ function TrackSection({ context, loading }: { readonly context: ReviewContext | 
 }
 
 function formatShortDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  return `${date.getMonth() + 1}/${String(date.getDate()).padStart(2, '0')}`;
+  return formatInDisplayZone(timestamp, { month: 'numeric', day: '2-digit' });
 }
 

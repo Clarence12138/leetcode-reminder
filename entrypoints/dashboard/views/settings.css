@@ -24,6 +24,7 @@
 .quota-controls { display: flex; align-items: center; gap: 8px; }
 .quota-input { width: 88px; height: 32px; }
 .srow .select-trigger { max-width: 260px; }
+.srow .select-trigger.tz-trigger { width: 360px; max-width: 100%; }
 
 /* 外观 */
 .ap-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; align-items: start; padding: 4px 0 14px; }

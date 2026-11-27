@@ -12,6 +12,7 @@ import {
   MAX_DAILY_REVIEW_LIMIT,
   MAX_REVIEW_GROUPS,
 } from './constants';
+import { isValidTimezone } from './day-keys';
 import type { BackupV2 } from './types';
 
 export const timestampSchema = z.number().int().nonnegative();
@@ -21,6 +22,8 @@ export const difficultySchema = z.enum(['EASY', 'MEDIUM', 'HARD']);
 export const masteryRatingSchema = z.enum(['AGAIN', 'HARD', 'GOOD', 'EASY']);
 export const submissionTriggerSchema = z.enum(['button', 'keyboard', 'import']);
 export const queueSortStrategySchema = z.enum(['due_asc', 'priority', 'stability_asc']);
+export const timezoneModeSchema = z.enum(['system', 'manual']);
+export const timezoneSchema = z.string().trim().min(1).refine(isValidTimezone, { message: '无法识别的时区' });
 export const builtinProblemListIdSchema = z.enum([
   'hot-100',
   'top-interview-150',
@@ -137,7 +140,8 @@ export const settingsPatchSchema = z
     notificationsEnabled: z.boolean(),
     reminderHour: z.number().int().min(0).max(23),
     reminderMinute: z.number().int().min(0).max(59),
-    timezone: z.string().min(1),
+    timezone: timezoneSchema,
+    timezoneMode: timezoneModeSchema,
     schemaVersion: z.literal(CURRENT_SCHEMA_VERSION),
     resetCodeOnReview: z.boolean(),
     dailyReviewLimit: z.number().int().min(1).max(MAX_DAILY_REVIEW_LIMIT).nullable(),
@@ -154,7 +158,8 @@ export const settingsSchema = z
     notificationsEnabled: z.boolean(),
     reminderHour: z.number().int().min(0).max(23),
     reminderMinute: z.number().int().min(0).max(59),
-    timezone: z.string().min(1),
+    timezone: timezoneSchema,
+    timezoneMode: timezoneModeSchema.default('system'),
     schemaVersion: z.literal(CURRENT_SCHEMA_VERSION),
     resetCodeOnReview: z.boolean().default(false),
     dailyReviewLimit: z.number().int().min(1).max(MAX_DAILY_REVIEW_LIMIT).nullable().default(null),

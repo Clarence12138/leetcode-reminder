@@ -121,9 +121,24 @@ describe('闹钟、通知和角标', () => {
     const atEight = new Date(2026, 0, 1, 8).getTime();
     const atTen = new Date(2026, 0, 1, 10).getTime();
 
-    expect(nextReminderTime(atEight, { reminderHour: 9, reminderMinute: 0 }).getDate()).toBe(1);
-    expect(nextReminderTime(atEight, { reminderHour: 9, reminderMinute: 0 }).getHours()).toBe(9);
-    expect(nextReminderTime(atTen, { reminderHour: 9, reminderMinute: 0 }).getDate()).toBe(2);
+    const clock = { reminderHour: 9, reminderMinute: 0, timezone: 'Asia/Shanghai' };
+    expect(nextReminderTime(atEight, clock).getDate()).toBe(1);
+    expect(nextReminderTime(atEight, clock).getHours()).toBe(9);
+    expect(nextReminderTime(atTen, clock).getDate()).toBe(2);
+  });
+
+  it('按设置时区而非运行环境时区计算提醒时间', () => {
+    // 上海 2026-01-01 10:00 = 纽约 2025-12-31 21:00，纽约当天的 09:00 已过。
+    const now = Date.UTC(2026, 0, 1, 2);
+    const next = nextReminderTime(now, { reminderHour: 9, reminderMinute: 30, timezone: 'America/New_York' });
+    expect(next.getTime()).toBe(Date.UTC(2026, 0, 1, 14, 30));
+  });
+
+  it('跨夏令时切换日仍落在当地墙上时间', () => {
+    // 纽约 2026-03-08 02:00 起跳到夏令时（UTC-4）。
+    const before = Date.UTC(2026, 2, 8, 5);
+    const next = nextReminderTime(before, { reminderHour: 9, reminderMinute: 0, timezone: 'America/New_York' });
+    expect(next.getTime()).toBe(Date.UTC(2026, 2, 8, 13));
   });
 
   it('点击每日汇总通知打开待处理队列', async () => {
@@ -218,6 +233,66 @@ describe('闹钟、通知和角标', () => {
     expect(result.created).toBe(true);
     expect(result.notificationId).toContain('xiaoshuaji-test:');
     expect(notifications.created[0]?.options.message).toContain('已交给 Chrome');
+  });
+});
+
+describe('手动时区', () => {
+  it('跟随系统时拒绝手动改时区，并随系统时区同步', async () => {
+    let system = 'Asia/Shanghai';
+    const repository = new ChromeSettingsRepository(new MemoryStorage(), () => system);
+    await expect(repository.get()).resolves.toMatchObject({ timezone: 'Asia/Shanghai', timezoneMode: 'system' });
+    await expect(repository.update({ timezone: 'Asia/Tokyo' })).rejects.toMatchObject({ code: 'TIMEZONE_MANAGED' });
+
+    system = 'Europe/London';
+    await expect(repository.ensureCurrentTimezone()).resolves.toMatchObject({
+      changed: true,
+      settings: { timezone: 'Europe/London' },
+    });
+  });
+
+  it('切到手动后沿用当前时区，可改为任意时区且不被系统时区覆盖', async () => {
+    let system = 'Asia/Shanghai';
+    const repository = new ChromeSettingsRepository(new MemoryStorage(), () => system);
+    await expect(repository.update({ timezoneMode: 'manual' })).resolves.toMatchObject({
+      timezone: 'Asia/Shanghai',
+      timezoneMode: 'manual',
+    });
+    await expect(repository.update({ timezone: ' America/New_York ' })).resolves.toMatchObject({ timezone: 'America/New_York' });
+
+    system = 'Europe/London';
+    await expect(repository.ensureCurrentTimezone()).resolves.toMatchObject({
+      changed: false,
+      settings: { timezone: 'America/New_York' },
+    });
+
+    await expect(repository.update({ timezoneMode: 'system' })).resolves.toMatchObject({
+      timezone: 'Europe/London',
+      timezoneMode: 'system',
+    });
+  });
+
+  it('拒绝无法识别的时区', async () => {
+    const repository = new ChromeSettingsRepository(new MemoryStorage(), () => 'Asia/Shanghai');
+    await expect(repository.update({ timezoneMode: 'manual', timezone: 'Mars/Olympus' })).rejects.toThrow();
+    await expect(repository.get()).resolves.toMatchObject({ timezone: 'Asia/Shanghai', timezoneMode: 'system' });
+  });
+
+  it('恢复备份时保留手动时区，跟随系统的备份改用本机时区', async () => {
+    const repository = new ChromeSettingsRepository(new MemoryStorage(), () => 'Asia/Shanghai');
+    const base = await repository.get();
+    await expect(repository.replace({ ...base, timezoneMode: 'manual', timezone: 'Asia/Tokyo' }))
+      .resolves.toMatchObject({ timezone: 'Asia/Tokyo', timezoneMode: 'manual' });
+    await expect(repository.replace({ ...base, timezoneMode: 'system', timezone: 'Asia/Tokyo' }))
+      .resolves.toMatchObject({ timezone: 'Asia/Shanghai', timezoneMode: 'system' });
+  });
+
+  it('手动时区下按该时区重建每日提醒闹钟', async () => {
+    const now = Date.UTC(2026, 0, 1, 2);
+    const { store } = createStore(now);
+    const dependencies = createReminderDependencies(store, now);
+    const updated = await dependencies.settings.update({ timezoneMode: 'manual', timezone: 'America/New_York', reminderHour: 9 });
+    await dependencies.reminders.settingsChanged(updated);
+    expect(dependencies.alarms.current?.scheduledTime).toBe(Date.UTC(2026, 0, 1, 14));
   });
 });
 

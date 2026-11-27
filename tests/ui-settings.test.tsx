@@ -84,6 +84,63 @@ describe('面板 · 设置', () => {
     expect(input).toHaveValue('09:00');
   });
 
+  it('关闭「跟随系统时区」后可在下拉框里搜索并选择任意时区', async () => {
+    renderView();
+    expect(screen.queryByRole('button', { name: '手动时区' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: '跟随系统时区' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
+      type: 'settings.update',
+      payload: { timezoneMode: 'manual' },
+    }));
+    cleanup();
+    sendMessage.mockClear();
+
+    renderView({ ...settings, timezoneMode: 'manual' });
+    const trigger = screen.getByRole('button', { name: '手动时区' });
+    expect(trigger).toHaveTextContent('Asia/Shanghai（上海）');
+    fireEvent.click(trigger);
+    const search = screen.getByRole('combobox', { name: '搜索手动时区' });
+    expect(search).toHaveFocus();
+    expect(screen.getAllByRole('option').length).toBeGreaterThan(300);
+    expect(screen.getByRole('option', { name: /Asia\/Shanghai/ })).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.change(search, { target: { value: 'zzqqxx' } });
+    expect(screen.getByText('没有匹配的时区')).toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: '东京' } });
+    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Asia/Tokyo（东京）');
+    fireEvent.keyDown(search, { key: 'Enter' });
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
+      type: 'settings.update',
+      payload: { timezone: 'Asia/Tokyo' },
+    }));
+    expect(screen.queryByRole('listbox', { name: '手动时区' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '手动时区' })).toHaveFocus();
+  });
+
+  it('时区下拉框支持直接打字展开、方向键选择和 Esc 关闭', async () => {
+    renderView({ ...settings, timezoneMode: 'manual' });
+    const trigger = screen.getByRole('button', { name: '手动时区' });
+    fireEvent.keyDown(trigger, { key: 'n' });
+    const search = screen.getByRole('combobox', { name: '搜索手动时区' });
+    expect(search).toHaveValue('n');
+    fireEvent.change(search, { target: { value: 'new york' } });
+    expect(screen.getAllByRole('option')[0]).toHaveTextContent('America/New_York');
+    fireEvent.keyDown(search, { key: 'Escape' });
+    expect(screen.queryByRole('combobox', { name: '搜索手动时区' })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(sendMessage).not.toHaveBeenCalled();
+
+    fireEvent.click(trigger);
+    const reopened = screen.getByRole('combobox', { name: '搜索手动时区' });
+    fireEvent.change(reopened, { target: { value: '+9' } });
+    fireEvent.keyDown(reopened, { key: 'ArrowDown' });
+    const options = screen.getAllByRole('option');
+    expect(options[1]).toHaveClass('is-active');
+    fireEvent.click(options[0]!);
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'settings.update' })));
+  });
+
   it('每日配额支持预设和自定义（1–200 校验）', async () => {
     renderView();
     fireEvent.click(screen.getByRole('radio', { name: '3 题' }));
