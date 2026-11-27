@@ -80,7 +80,7 @@ h1, h2, h3, h4, p { margin: 0; }
 .btn.loading::after { position: absolute; inset: 0; width: 16px; height: 16px; margin: auto; border: 2px solid color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor; border-radius: 50%; content: ""; animation: spin .7s linear infinite; }
 .btn.primary.loading::after { border-color: color-mix(in srgb, var(--on-brand) 35%, transparent); border-top-color: var(--on-brand); }
 .btn .ico, .iconbtn .ico, .chip .ico { flex: 0 0 auto; }
-.btn-label { display: inline-flex; align-items: center; gap: 7px; }
+.btn-label { display: inline-flex; min-width: 0; max-width: 100%; align-items: center; gap: 7px; }
 
 .kbd { display: inline-grid; min-width: 20px; height: 20px; place-items: center; padding: 0 5px; border-radius: 5px; background: color-mix(in srgb, currentColor 16%, transparent); font: 600 12px/1 var(--font); }
 kbd.key { padding: 1px 5px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); background: var(--surface); font: 11px var(--mono); }

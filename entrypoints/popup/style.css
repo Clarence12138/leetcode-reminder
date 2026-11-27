@@ -18,8 +18,8 @@ body { overflow: hidden; }
 .pop-today-note { margin: 0; line-height: 1.55; }
 .pop-facts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; }
 .pop-facts b { color: var(--ink); font-weight: 600; }
-.pop-start { min-width: 0; }
-.pop-start-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pop-start { min-width: 0; overflow: hidden; }
+.pop-start-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pop-done-mark { display: grid; width: 20px; height: 20px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: var(--on-brand); background: var(--brand); }
 .pop-welcome { overflow: hidden; }
 
