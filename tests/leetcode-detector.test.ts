@@ -178,6 +178,21 @@ describe('SubmissionDetector 路由驱动检测', () => {
     expect(context.client.getSubmissionStatus).toHaveBeenCalledTimes(2);
     expect(context.accepted[0]?.submissionId).toBe('retry-id');
   });
+
+  it('切题后调用 retryLast 会通知退出检测中状态', async () => {
+    const context = setup();
+    const monitoring: boolean[] = [];
+    const detector = new (context.detector.constructor as typeof SubmissionDetector)(context.client, {
+      onAccepted: async () => undefined,
+      onIssue: async () => undefined,
+      onMonitoringChange: (value) => monitoring.push(value),
+    });
+    detector.updateRoute(route('two-sum'));
+    detector.updateRoute(route('add-two-numbers'));
+    monitoring.length = 0;
+    await detector.retryLast();
+    expect(monitoring).toEqual([false]);
+  });
 });
 
 function setup(now: () => number = Date.now) {

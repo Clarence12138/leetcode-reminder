@@ -194,10 +194,19 @@ export class ContentController {
     this.transition({ kind: 'idle' });
   }
 
+  dismissError(): void {
+    if (this.notice.kind === 'error') this.transition({ kind: 'idle' });
+  }
+
   async retry(): Promise<void> {
     if (!this.retryHandler) return;
     this.update({ kind: 'monitoring' });
-    await this.retryHandler();
+    try {
+      await this.retryHandler();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.update({ kind: 'error', message, retryable: true });
+    }
   }
 
   async recordIssue(

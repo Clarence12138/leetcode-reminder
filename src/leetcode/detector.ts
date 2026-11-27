@@ -83,7 +83,11 @@ export class SubmissionDetector {
   }
 
   async retryLast(): Promise<void> {
-    if (!this.lastAttempt || this.activeController) return;
+    if (!this.lastAttempt) {
+      this.callbacks.onMonitoringChange(false);
+      return;
+    }
+    if (this.activeController) return;
     await this.runAttempt(this.lastAttempt);
   }
 

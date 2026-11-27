@@ -283,6 +283,41 @@ describe('ContentController', () => {
       await controller.undo();
       expect(sendMessage).not.toHaveBeenCalled();
     });
+
+    it('dismissError 只关闭错误态，不误关评分卡或完成卡', async () => {
+      const { controller, last } = install();
+      await controller.handleAccepted(ACCEPTED);
+      controller.dismissError();
+      expect(last()).toMatchObject({ kind: 'rating' });
+
+      await controller.rate('GOOD');
+      await flush();
+      controller.dismissError();
+      expect(last()).toMatchObject({ kind: 'success' });
+
+      await controller.recordIssue('检测失败', true, {
+        type: 'issue.record',
+        payload: {
+          slug: 'two-sum',
+          occurredAt: ACCEPTED_AT,
+          code: 'NETWORK_ERROR',
+          retryable: true,
+          diagnostic: '检测失败',
+          readAt: null,
+          resolvedAt: null,
+        },
+      });
+      expect(last()).toMatchObject({ kind: 'error' });
+      controller.dismissError();
+      expect(last()).toEqual({ kind: 'idle' });
+    });
+
+    it('retry 异常时回到错误态，不会永久停在检测中', async () => {
+      const { controller, last } = install();
+      controller.setRetryHandler(async () => { throw new Error('boom'); });
+      await controller.retry();
+      expect(last()).toMatchObject({ kind: 'error', message: 'boom', retryable: true });
+    });
   });
 });
 
